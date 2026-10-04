@@ -8,7 +8,7 @@ import java.util.Locale;
 
 /**
  * Treasure chest lockpick helper (display only, you still aim): Hypixel shows "crit" particles on the chest;
- * this marks the latest one with a bright pink dot and tells you on the HUD which way to move your aim.
+ * this marks the spot with a green square on your screen and tells you on the HUD which way to move your aim.
  * Wiki tip built in: the hit spot is a pixel or two above the particles.
  */
 public final class Lockpick {
@@ -40,15 +40,29 @@ public final class Lockpick {
 
     private static boolean active() { return System.currentTimeMillis() - seenAt < 1500; }
 
-    public static void tick(Minecraft mc) {
-        if (!active() || mc.level == null || ++tick % 2 != 0) return;
-        var pink = Particles.dust(0xFF40FF, 0.7f);
-        Particles.point(pink, tx, ty, tz);
-        // a tiny cross around the spot so it stands out from the chest texture
-        Particles.point(pink, tx + 0.06, ty, tz);
-        Particles.point(pink, tx - 0.06, ty, tz);
-        Particles.point(pink, tx, ty + 0.06, tz);
-        Particles.point(pink, tx, ty - 0.06, tz);
+    public static void tick(Minecraft mc) { }
+
+    /**
+     * Where the lockpick spot is on your screen (GUI pixels), or null if not active / behind you.
+     * Projects the 3D point through your camera (yaw, pitch, field of view).
+     */
+    public static int[] screenPos(Minecraft mc) {
+        if (!Config.get().lockpickHelper || !active() || mc.player == null) return null;
+        double dx = tx - mc.player.getX(), dy = ty - mc.player.getEyeY(), dz = tz - mc.player.getZ();
+        double yaw = Math.toRadians(mc.player.getYRot()), pitch = Math.toRadians(mc.player.getXRot());
+        double fx = -Math.sin(yaw) * Math.cos(pitch), fy = -Math.sin(pitch), fz = Math.cos(yaw) * Math.cos(pitch);   // forward
+        double rx = -Math.cos(yaw), ry = 0, rz = -Math.sin(yaw);                                                       // right
+        double ux = ry * fz - rz * fy, uy = rz * fx - rx * fz, uz = rx * fy - ry * fx;                                  // up = right × forward
+        double cz = dx * fx + dy * fy + dz * fz;
+        if (cz < 0.1) return null;                                                                                       // behind you
+        double cx = dx * rx + dy * ry + dz * rz, cy = dx * ux + dy * uy + dz * uz;
+        double fov = 70;
+        Object opt = Reflect.call(Reflect.field(mc, "options"), "fov");
+        Object v = Reflect.call(opt, "get");
+        if (v instanceof Number n) fov = n.doubleValue();
+        int w = mc.getWindow().getGuiScaledWidth(), h = mc.getWindow().getGuiScaledHeight();
+        double focal = (h / 2.0) / Math.tan(Math.toRadians(fov) / 2);
+        return new int[]{(int) Math.round(w / 2.0 + cx / cz * focal), (int) Math.round(h / 2.0 - cy / cz * focal)};
     }
 
     /** HUD: where to move your aim (or "on target"). */
@@ -63,13 +77,13 @@ public final class Lockpick {
         double dPitch = pitchTo - mc.player.getXRot();
         double dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
         double tol = Math.toDegrees(Math.atan2(0.07, Math.max(0.5, dist)));         // ~1 pixel of the chest
-        if (Math.abs(dYaw) <= tol && Math.abs(dPitch) <= tol) { out.add("§d§lLockpick §a§l✔ ON TARGET"); return; }
+        if (Math.abs(dYaw) <= tol && Math.abs(dPitch) <= tol) { out.add("§a§lLockpick ✔ ON TARGET"); return; }
         StringBuilder dir = new StringBuilder();
         if (dPitch < -tol) dir.append("↑ ");
         if (dPitch > tol) dir.append("↓ ");
         if (dYaw < -tol) dir.append("← ");
         if (dYaw > tol) dir.append("→ ");
-        out.add("§d§lLockpick §faim at the pink dot §e" + dir.toString().trim()
+        out.add("§a§lLockpick §faim at the green square §e" + dir.toString().trim()
                 + String.format(Locale.US, " §8(%.1f°)", Math.max(Math.abs(dYaw), Math.abs(dPitch))));
     }
 

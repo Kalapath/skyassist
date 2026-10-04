@@ -1,5 +1,11 @@
 # Changelog
 
+## 8.1.1
+- Full check: rarity fallback that never covers items, commands list completed.
+
+## 8.1.0
+- Menu hooks attached after init (rarity/search/labels/tooltip scroll work), pests detected as Garden bats/silverfish, green lockpick square, Mining best-ore + purse line toggles, HOTM/HOTF tree + upgrade order.
+
 ## 8.0.0
 - Performance monitor + mode, shader fallback, clash-free first layout, playstyle setup, macro keys, Inquisitor sharing + party waypoints, mineshaft alert, CH waypoints, boss health, contest standing, storage overview, swim/swing/rainbow extras.
 

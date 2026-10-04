@@ -73,7 +73,7 @@ public final class InvSearch {
             if (!added) throw new IllegalStateException("couldn't add the search box");
             box = b;
             boxScreen = screen;
-            if (KEYS_HOOKED.add(screen)) blockKeysWhileTyping(screen);    // once per menu, even after a resize
+            blockKeysWhileTyping(screen);               // menu events are fresh after every init, so attach each time
             works = true;
         } catch (Throwable t) {
             works = false;

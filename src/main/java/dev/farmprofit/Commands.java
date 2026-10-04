@@ -26,6 +26,7 @@ public final class Commands {
 
     static {
         add("Main", "/skyassist", "Main menu with everything (also the P key or /profit menu).");
+        add("Main", "/profit menu", "Same main menu (also P).");
         add("Main", "/skyassist help", "This list (also /profit help).");
         add("Main", "/profit settings", "All settings, with search (also the O key or /profitsettings).");
         add("Main", "/profit", "Current session: items, profit, costs (menu).");

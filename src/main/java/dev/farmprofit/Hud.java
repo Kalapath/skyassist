@@ -177,7 +177,7 @@ public final class Hud {
         if (s.costs > 0) out.add("§7" + (s.isCombat() ? "Quest costs" : "Costs") + ": §c-" + Fmt.coins(s.costs));
         double spent = s.spentValue();
         if (spent > 0) out.add("§7Spent: §c-" + Fmt.coins(spent) + " §8(" + s.spent.size() + " item" + (s.spent.size() > 1 ? "s" : "") + ")");
-        if (s.purseCoins > 0) out.add("§7Purse coins: §6+" + Fmt.coins(s.purseCoins) + " §8(Bountiful, mob coins...)");
+        if (s.purseCoins > 0 && Config.get().hudShowPurse) out.add("§7Purse coins: §6+" + Fmt.coins(s.purseCoins) + " §8(Bountiful, mob coins...)");
         if (s.copper > 0) out.add("§7Copper: §c" + Fmt.num(s.copper) + (Config.get().copperValue > 0 ? " §8(" + Fmt.coins(s.copper * Config.get().copperValue) + ")" : ""));
     }
 

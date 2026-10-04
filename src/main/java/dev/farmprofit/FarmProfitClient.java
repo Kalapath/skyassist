@@ -76,13 +76,13 @@ public final class FarmProfitClient implements ClientModInitializer {
             TooltipScroll.apply(lines);
         });
         // mouse wheel inside menus scrolls long tooltips (and only then; otherwise the menu scrolls as usual)
-        java.util.Set<Object> overlaid = java.util.Collections.newSetFromMap(new java.util.WeakHashMap<>());
-        ScreenEvents.AFTER_INIT.register((client, screen, w, h) -> InvSearch.attach(screen, w, h));
-        ScreenEvents.BEFORE_INIT.register((client, screen, w, h) -> {
-            if (!overlaid.add(screen)) return;          // a resize re-inits the same menu: hook it up only once
+        // Per-menu hooks MUST be attached after the menu is set up: Fabric recreates a menu's events every time it's
+        // (re)initialised, so anything attached earlier is thrown away. Re-attaching on every init is therefore correct.
+        ScreenEvents.AFTER_INIT.register((client, screen, w, h) -> {
             ScreenMouseEvents.allowMouseScroll(screen).register((s, mouseX, mouseY, horizontal, vertical) ->
                     TooltipScroll.onScroll(vertical));
-            ScreenOverlay.register(screen);             // rarity colors, search highlights, terminal solvers
+            ScreenOverlay.register(screen);             // rarity colors, item labels, search highlights, terminal solvers
+            InvSearch.attach(screen, w, h);             // search box (+ its key handling)
         });
 
         // Crops (farming breaks happen on the client)
@@ -132,6 +132,13 @@ public final class FarmProfitClient implements ClientModInitializer {
         ClientTickEvents.END_CLIENT_TICK.register(Tracker::tick);
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> Tracker.endAll(false));
 
+        // lockpick: a green square exactly over the spot to aim at
+        HudElementRegistry.attachElementBefore(VanillaHudElements.CHAT, Identifier.fromNamespaceAndPath("skyassist", "lockpick"), (graphics, delta) -> {
+            int[] p = Lockpick.screenPos(Minecraft.getInstance());
+            if (p == null) return;
+            graphics.fill(p[0] - 4, p[1] - 4, p[0] + 4, p[1] + 4, 0xFF004000);     // dark border
+            graphics.fill(p[0] - 3, p[1] - 3, p[0] + 3, p[1] + 3, 0xFF33FF33);     // bright green
+        });
         // rarity colors on the hotbar
         HudElementRegistry.attachElementAfter(VanillaHudElements.HOTBAR, Identifier.fromNamespaceAndPath("skyassist", "rarity"), (graphics, delta) -> {
             Minecraft mc = Minecraft.getInstance();

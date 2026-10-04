@@ -56,30 +56,41 @@ public final class Pests {
         }
     }
 
+    /**
+     * Pests are a Bat (Fly, Mosquito, Moth) or a Silverfish (all the others) in the Garden, where no other bats or
+     * silverfish exist (wiki). That's what's searched for; the floating name tag only supplies the pest's name.
+     */
     private static void scan(Minecraft mc) {
         pests.clear();
         Object all = Reflect.call(mc.level, new String[]{"entitiesForRendering", "getEntities"});
         if (!(all instanceof Iterable<?> it)) return;
+        List<Entity> list = new ArrayList<>();
+        for (Object o : it) if (o instanceof Entity e) list.add(e);
         java.util.Set<Integer> glow = new java.util.HashSet<>();
-        for (Object o : it) {
-            if (!(o instanceof Entity e) || !e.hasCustomName() || e.getCustomName() == null) continue;
-            String tag = Tracker.strip(e.getCustomName().getString()).trim();
-            String name = null;
-            Matcher m = PEST_TAG.matcher(tag);
-            if (tag.contains("ൠ") && m.find()) name = m.group(1).trim();
-            if (name == null) continue;
-            Entity mob = mobUnder(e, it);
-            pests.add(new Pest(name, e.getX(), e.getY(), e.getZ(), mob));
-            glow.add(e.getId());
-            if (mob != null) glow.add(mob.getId());
-            // the pest's model is made of armor stands wearing heads right around the tag: outline those too
-            for (Object o2 : it) {
-                if (!(o2 instanceof Entity part) || part == e) continue;
-                String t = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(part.getType()).getPath();
-                if (!t.equals("armor_stand")) continue;
-                if (Math.abs(part.getX() - e.getX()) < 1.2 && Math.abs(part.getZ() - e.getZ()) < 1.2 && part.getY() <= e.getY() + 0.5 && part.getY() > e.getY() - 2.5)
-                    glow.add(part.getId());
+        for (Entity mob : list) {
+            String type = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(mob.getType()).getPath();
+            if (!type.equals("bat") && !type.equals("silverfish")) continue;
+            String name = type.equals("bat") ? "Flying pest" : "Pest";
+            Entity tag = null;
+            for (Entity t : list) {                         // its name tag floats just above it
+                if (t == mob || !t.hasCustomName() || t.getCustomName() == null) continue;
+                if (Math.abs(t.getX() - mob.getX()) > 1.5 || Math.abs(t.getZ() - mob.getZ()) > 1.5 || t.getY() < mob.getY() - 0.5 || t.getY() > mob.getY() + 3) continue;
+                String s = Tracker.strip(t.getCustomName().getString()).trim();
+                for (String n : NAMES) if (s.contains(n)) { name = n; tag = t; break; }
+                if (tag != null) break;
             }
+            pests.add(new Pest(name, mob.getX(), mob.getY() + 1, mob.getZ(), mob));
+            glow.add(mob.getId());
+            if (tag != null) glow.add(tag.getId());
+            // the pest's head model is an armor stand right at it: outline that too
+            for (Entity part : list) {
+                if (part == mob) continue;
+                String t = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(part.getType()).getPath();
+                if (t.equals("armor_stand") && Math.abs(part.getX() - mob.getX()) < 1.0 && Math.abs(part.getZ() - mob.getZ()) < 1.0
+                        && Math.abs(part.getY() - mob.getY()) < 2.0) glow.add(part.getId());
+            }
+            // also set Minecraft's own glow flag (works even if the glow hook couldn't attach)
+            if (Config.get().pestGlow && !Glow.useParticles()) Reflect.call(mob, "setGlowingTag", true);
         }
         GLOWING.clear();
         GLOWING.addAll(glow);
@@ -87,6 +98,9 @@ public final class Pests {
         double px = mc.player.getX(), pz = mc.player.getZ();
         pests.sort((a, b) -> Double.compare(Math.hypot(a.x() - px, a.z() - pz), Math.hypot(b.x() - px, b.z() - pz)));
     }
+
+    public static int count() { return pests.size(); }
+
 
     /** The actual pest mob under its floating name tag (the tag itself is an invisible armor stand). */
     private static Entity mobUnder(Entity tag, Iterable<?> all) {
@@ -109,7 +123,7 @@ public final class Pests {
             var bb = p.mob().getBoundingBox();
             x1 = bb.minX - 0.15; y1 = bb.minY - 0.1; z1 = bb.minZ - 0.15; x2 = bb.maxX + 0.15; y2 = bb.maxY + 0.15; z2 = bb.maxZ + 0.15;
         } else {
-            x1 = p.x() - 0.6; y1 = p.y() - 1.6; z1 = p.z() - 0.6; x2 = p.x() + 0.6; y2 = p.y() + 0.2; z2 = p.z() + 0.6;
+            x1 = p.x() - 0.6; y1 = p.y() - 1.2; z1 = p.z() - 0.6; x2 = p.x() + 0.6; y2 = p.y() + 0.2; z2 = p.z() + 0.6;
         }
         var c = Particles.dust(Config.get().pestBoxColor(), 1.6f);
         double[][] corners = {{x1, y1, z1}, {x2, y1, z1}, {x2, y1, z2}, {x1, y1, z2}, {x1, y2, z1}, {x2, y2, z1}, {x2, y2, z2}, {x1, y2, z2}};

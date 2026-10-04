@@ -35,6 +35,8 @@ public final class Config {
     public String glowStyle = "auto";
     @Setting(category = "General", label = "Count purse coins", desc = "Coins that go straight into your purse while you're active (Bountiful reforge, mob coins, Midas, coin catches...) count as profit. Read from the sidebar; menus are ignored so selling / bank don't count.")
     public boolean trackPurse = true;
+    @Setting(category = "HUD", label = "Show purse coins line", desc = "The 'Purse coins: +X (Bountiful, mob coins...)' line. Off = still counted in profit, just not listed.")
+    public boolean hudShowPurse = false;
     @Setting(category = "General", label = "Number format", desc = "compact = 1.2M, full = 1,234,567.", options = {"compact", "full"})
     public String numberFormat = "compact";
     @Setting(category = "HUD", label = "Background opacity", desc = "0 = invisible, 255 = solid black.", min = 0, max = 255)
@@ -105,8 +107,10 @@ public final class Config {
     public boolean chWaypoints = true;
     @Setting(category = "Mining", label = "Treasure chest lifetime (s)", desc = "How long an uncovered chest stays before it disappears (about 60 s).", min = 10, max = 300)
     public int chestLifetimeSeconds = 60;
-    @Setting(category = "Mining", label = "Lockpick helper", desc = "Marks the lockpick spot on treasure chests with a pink dot and shows on the HUD which way to move your aim. Display only: you aim yourself.")
+    @Setting(category = "Mining", label = "Lockpick helper", desc = "Marks the lockpick spot on treasure chests with a green square on your screen and shows which way to move your aim. Display only: you aim yourself.")
     public boolean lockpickHelper = true;
+    @Setting(category = "Mining", label = "Best ore on Mining HUD", desc = "Show the 'Best now' ore line on the Mining HUD. The full list is always in /miningprofit suggest.")
+    public boolean mineShowSuggestion = false;
     @Setting(category = "Mining", label = "Lockpick aim offset (pixels)", desc = "How far above the particles to mark the spot (the wiki says 1-2 pixels above). 0 = exactly on the particles.", min = -4, max = 6)
     public int lockpickOffset = 1;
     @Setting(category = "Mining", label = "Blocks listed", desc = "How many block types the breakdown shows.", min = 1, max = 20)

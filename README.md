@@ -51,6 +51,23 @@ Open chat (**T**). While chat is open:
 Detected automatically from your purse on the sidebar when a quest starts (handles Aatrox discounts etc.).
 If you'd rather use a fixed number, set `slayerQuestCost` in the config (anything above 0 overrides auto-detection).
 
+## New in 8.1.1 — full check
+- Rarity colors can never hide an item: if this Minecraft version can't redraw the item on top, a light see-through
+  tint is used instead (`/profit debug` shows which).
+- `/profit menu` added to the Commands list; every command, menu and setting checked to be reachable.
+
+## New in 8.1 — fixes
+- **Rarity colors, search highlights, item labels, terminal solvers and tooltip scrolling now actually work in menus.**
+  They were attached to each menu before Fabric set the menu up, and Fabric throws those away during setup; they're
+  now attached right after.
+- **Pests are found reliably**: a pest is a Bat (Fly, Mosquito, Moth) or a Silverfish (all others) in the Garden
+  (wiki). Their name tag is only used for the name. Green glow outline + green box + HUD arrows follow from that;
+  `/profit debug` shows how many pests are seen.
+- **Lockpick**: a plain green square drawn exactly over the spot to aim at (no particles).
+- "Best now" on the Mining HUD and the purse coins line are **off by default** (switches in Mining / HUD settings).
+- **/hotm and /hotf**: every strategy now has a tree overview (what's on each tier) and a numbered upgrade order
+  with target levels, from the 2026 wiki pages (incl. the Anomalous Desire → Tunnel Vision rename).
+
 ## New in 8.0
 1. **Performance**: `/profit perf` shows how much time each feature uses; **Performance mode** (General) makes scans
    and particle markers run half as often; outlines don't scan at all where nothing can glow.

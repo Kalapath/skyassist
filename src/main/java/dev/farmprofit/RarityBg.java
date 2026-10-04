@@ -55,9 +55,14 @@ public final class RarityBg {
     }
 
     /** Draws an item (and its stack count) on top of a color. False if this version can't. */
+    /** null = not tried yet, false = this Minecraft version can't redraw items from here (then we only tint lightly). */
+    static Boolean canDrawItems;
+
     static boolean drawItem(Object g, ItemStack stack, int x, int y) {
-        Object r = Reflect.call(g, new String[]{"item", "renderItem"}, stack, x, y);
-        if (r == Reflect.FAIL) return false;
+        if (canDrawItems == Boolean.FALSE) return false;
+        Object r = Reflect.call(g, new String[]{"item", "renderItem", "fakeItem", "renderFakeItem"}, stack, x, y);
+        if (r == Reflect.FAIL) { canDrawItems = false; return false; }
+        canDrawItems = true;
         Object font = Minecraft.getInstance().font;
         Reflect.call(g, new String[]{"itemDecorations", "renderItemDecorations"}, font, stack, x, y);
         return true;
@@ -80,8 +85,9 @@ public final class RarityBg {
             int x = left + sx, y = top + sy;
             if (mouseX >= x && mouseX < x + 16 && mouseY >= y && mouseY < y + 16) continue;   // keep the hover highlight
             if (InvSearch.active() && !InvSearch.matches(stack)) continue;                     // search dims these instead
+            if (canDrawItems == Boolean.FALSE) { Reflect.call(g, "fill", x, y, x + 16, y + 16, argb(c, true)); continue; }
             Reflect.call(g, "fill", x, y, x + 16, y + 16, argb(c, false));
-            if (!drawItem(g, stack, x, y)) Reflect.call(g, "fill", x, y, x + 16, y + 16, 0);   // (couldn't redraw: color only)
+            drawItem(g, stack, x, y);
         }
     }
 
@@ -89,6 +95,7 @@ public final class RarityBg {
     static void drawHotbar(Minecraft mc, Object g) {
         for (int[] b : hotbarBoxes(mc)) {
             if (b == null) continue;
+            if (canDrawItems == Boolean.FALSE) { Reflect.call(g, "fill", b[0], b[1], b[2], b[3], (b[4] & 0xFFFFFF) | 0x40000000); continue; }
             Reflect.call(g, "fill", b[0], b[1], b[2], b[3], b[4]);
             drawItem(g, mc.player.getInventory().getItem(b[5]), b[0], b[1]);
         }
