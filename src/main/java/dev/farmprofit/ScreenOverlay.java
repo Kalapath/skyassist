@@ -43,7 +43,7 @@ final class ScreenOverlay {
                     }
                     return null;
                 });
-                event.getClass().getMethod("register", Object.class).invoke(event, proxy);
+                Events.register(event, proxy);
                 works = true;
                 return;
             }
@@ -69,7 +69,7 @@ final class ScreenOverlay {
                     if (args != null && args.length >= 2) try { run.accept(args[0], args[1]); } catch (Throwable ignored) {}
                     return null;
                 });
-                event.getClass().getMethod("register", Object.class).invoke(event, proxy);
+                Events.register(event, proxy);
                 return true;
             }
         } catch (Throwable ignored) {}

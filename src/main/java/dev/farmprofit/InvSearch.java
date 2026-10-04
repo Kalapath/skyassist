@@ -102,7 +102,7 @@ public final class InvSearch {
                     Reflect.call(box, "keyPressed", rest);               // backspace, arrows, ctrl+a ... go to the box
                     return false;                                          // and nothing else reacts to the key
                 });
-                event.getClass().getMethod("register", Object.class).invoke(event, proxy);
+                Events.register(event, proxy);
                 keysWork = true;
                 return;
             }

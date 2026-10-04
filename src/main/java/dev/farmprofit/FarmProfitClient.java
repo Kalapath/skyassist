@@ -136,8 +136,16 @@ public final class FarmProfitClient implements ClientModInitializer {
         HudElementRegistry.attachElementBefore(VanillaHudElements.CHAT, Identifier.fromNamespaceAndPath("skyassist", "lockpick"), (graphics, delta) -> {
             int[] p = Lockpick.screenPos(Minecraft.getInstance());
             if (p == null) return;
-            graphics.fill(p[0] - 4, p[1] - 4, p[0] + 4, p[1] + 4, 0xFF004000);     // dark border
-            graphics.fill(p[0] - 3, p[1] - 3, p[0] + 3, p[1] + 3, 0xFF33FF33);     // bright green
+            int x = p[0], y = p[1];
+            // crosshair arms (black under lime) so you can find the spot from the side
+            graphics.fill(x - 16, y - 2, x - 8, y + 2, 0xFF000000); graphics.fill(x + 8, y - 2, x + 16, y + 2, 0xFF000000);
+            graphics.fill(x - 2, y - 16, x + 2, y - 8, 0xFF000000); graphics.fill(x - 2, y + 8, x + 2, y + 16, 0xFF000000);
+            graphics.fill(x - 15, y - 1, x - 9, y + 1, 0xFF39FF14); graphics.fill(x + 9, y - 1, x + 15, y + 1, 0xFF39FF14);
+            graphics.fill(x - 1, y - 15, x + 1, y - 9, 0xFF39FF14); graphics.fill(x - 1, y + 9, x + 1, y + 15, 0xFF39FF14);
+            // the square: black edge, white ring, solid neon green
+            graphics.fill(x - 7, y - 7, x + 7, y + 7, 0xFF000000);
+            graphics.fill(x - 6, y - 6, x + 6, y + 6, 0xFFFFFFFF);
+            graphics.fill(x - 5, y - 5, x + 5, y + 5, 0xFF39FF14);
         });
         // rarity colors on the hotbar
         HudElementRegistry.attachElementAfter(VanillaHudElements.HOTBAR, Identifier.fromNamespaceAndPath("skyassist", "rarity"), (graphics, delta) -> {
@@ -241,8 +249,8 @@ public final class FarmProfitClient implements ClientModInitializer {
                             .executes(ctx -> { TalismansScreen.requestOpen(IntegerArgumentType.getInteger(ctx, "count")); return 1; })));
             dispatcher.register(ClientCommands.literal("itemsearch").executes(ctx -> { MenuScreen.open(() -> Storage.screen(null)); return 1; }));
             dispatcher.register(ClientCommands.literal("waypoints").executes(ctx -> { MenuScreen.open(() -> Waypoints.screen(null)); return 1; }));
-            dispatcher.register(ClientCommands.literal("hotm").executes(ctx -> { MenuScreen.open(() -> Guides.hotm(null)); return 1; }));
-            dispatcher.register(ClientCommands.literal("hotf").executes(ctx -> { MenuScreen.open(() -> Guides.hotf(null)); return 1; }));
+            dispatcher.register(ClientCommands.literal("hotm").executes(ctx -> { MenuScreen.open(() -> TreeGuideScreen.hotm(null)); return 1; }));
+            dispatcher.register(ClientCommands.literal("hotf").executes(ctx -> { MenuScreen.open(() -> TreeGuideScreen.hotf(null)); return 1; }));
             dispatcher.register(ClientCommands.literal("greenhouse").executes(ctx -> { MenuScreen.open(() -> Greenhouse.screen(null)); return 1; }));
             dispatcher.register(ClientCommands.literal("shards").executes(ctx -> { MenuScreen.open(() -> Shards.screen(null)); return 1; }));
             dispatcher.register(ClientCommands.literal("dungeon")

@@ -132,8 +132,8 @@ public final class Prices {
                 ID_NAMES.putIfAbsent(id, name);
             }
             if (it.has("npc_sell_price")) NPC.put(id, it.get("npc_sell_price").getAsDouble());
-            if (id.startsWith("SHARD_") && it.has("tier") && it.has("name"))                       // attribute shards, with rarity
-                Shards.fromApi(id, Tracker.strip(it.get("name").getAsString()), it.get("tier").getAsString());
+            if (it.has("name") && Shards.looksLikeShard(id, Tracker.strip(it.get("name").getAsString())))   // attribute shards, with rarity
+                Shards.fromApi(id, Tracker.strip(it.get("name").getAsString()), it.has("tier") ? it.get("tier").getAsString() : "");
         }
         itemsLoaded = true;
     }

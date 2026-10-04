@@ -51,6 +51,19 @@ Open chat (**T**). While chat is open:
 Detected automatically from your purse on the sidebar when a quest starts (handles Aatrox discounts etc.).
 If you'd rather use a fixed number, set `slayerQuestCost` in the config (anything above 0 overrides auto-detection).
 
+## New in 8.2
+- **Root cause found for menus**: overlays (rarity colors, search highlights, item labels, terminal solvers) and the
+  search box's key handling were registered through a Fabric-internal class that Java refuses to call; registration
+  failed silently every time. They now register through Fabric's public Event type.
+- **Pests**: only the visible head is highlighted (outline + a tight particle box around it).
+- **Ultimate enchants** are recognised by name too, so they always keep Hypixel's bold pink.
+- **Lockpick**: a bigger neon-green square with black/white edges and crosshair arms.
+- **/shards**: finds attribute shards by "SHARD" in the ID + name ending in "Shard", with the Bazaar list as backup;
+  `/profit debug` shows how many it found.
+- **/hotm and /hotf** open a **graphic tree**: perks by tier as boxes colored green (core) / yellow (later) / gray
+  (skip) with step numbers and target levels, next to the step-by-step plan (e.g. Mining Speed → 10, Mining Fortune → 10,
+  Great Explorer → max, Efficient Miner → 30 ...). "Text guide" opens the detailed text version.
+
 ## New in 8.1.1 — full check
 - Rarity colors can never hide an item: if this Minecraft version can't redraw the item on top, a light see-through
   tint is used instead (`/profit debug` shows which).

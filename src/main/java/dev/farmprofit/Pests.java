@@ -19,7 +19,7 @@ public final class Pests {
     private static final Pattern PEST_TAG = Pattern.compile("ൠ\\s*([A-Za-z ]+?)(?:\\s+[\\d.,]+[kKmM]?(?:/[\\d.,]+[kKmM]?)?\\s*❤)?\\s*$");
     private static final String[] ARROWS = {"↑", "↗", "→", "↘", "↓", "↙", "←", "↖"};
 
-    public record Pest(String name, double x, double y, double z, Entity mob) {}
+    public record Pest(String name, double x, double y, double z, Entity mob, Entity head) {}
 
     private static final List<Pest> pests = new ArrayList<>();
     private static final java.util.Set<Integer> GLOWING = java.util.concurrent.ConcurrentHashMap.newKeySet();
@@ -79,18 +79,23 @@ public final class Pests {
                 for (String n : NAMES) if (s.contains(n)) { name = n; tag = t; break; }
                 if (tag != null) break;
             }
-            pests.add(new Pest(name, mob.getX(), mob.getY() + 1, mob.getZ(), mob));
-            glow.add(mob.getId());
-            if (tag != null) glow.add(tag.getId());
-            // the pest's head model is an armor stand right at it: outline that too
+            // what you actually SEE is the head: an armor stand right at the mob wearing the pest's head
+            Entity head = null;
+            double best = 9;
             for (Entity part : list) {
-                if (part == mob) continue;
+                if (part == mob || !(part instanceof net.minecraft.world.entity.LivingEntity le)) continue;
                 String t = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(part.getType()).getPath();
-                if (t.equals("armor_stand") && Math.abs(part.getX() - mob.getX()) < 1.0 && Math.abs(part.getZ() - mob.getZ()) < 1.0
-                        && Math.abs(part.getY() - mob.getY()) < 2.0) glow.add(part.getId());
+                if (!t.equals("armor_stand") || le.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD).isEmpty()) continue;
+                double d = Math.abs(part.getX() - mob.getX()) + Math.abs(part.getZ() - mob.getZ()) + Math.abs(part.getY() - mob.getY()) * 0.5;
+                if (Math.abs(part.getX() - mob.getX()) < 1.2 && Math.abs(part.getZ() - mob.getZ()) < 1.2 && Math.abs(part.getY() - mob.getY()) < 2.5 && d < best) { best = d; head = part; }
             }
-            // also set Minecraft's own glow flag (works even if the glow hook couldn't attach)
-            if (Config.get().pestGlow && !Glow.useParticles()) Reflect.call(mob, "setGlowingTag", true);
+            pests.add(new Pest(name, mob.getX(), mob.getY() + 1, mob.getZ(), mob, head));
+            if (head != null) {
+                glow.add(head.getId());                         // only the head glows
+                if (Config.get().pestGlow && !Glow.useParticles()) Reflect.call(head, "setGlowingTag", true);
+            } else {
+                glow.add(mob.getId());                          // no head found: outline the mob instead
+            }
         }
         GLOWING.clear();
         GLOWING.addAll(glow);
@@ -119,18 +124,22 @@ public final class Pests {
     /** A box of bright particles along the 12 edges of the pest's hitbox (or a 1-block box at its tag). */
     private static void box(Pest p) {
         double x1, y1, z1, x2, y2, z2;
-        if (p.mob() != null) {
+        if (p.head() != null) {
+            // the head sits at the top of its armor stand
+            double cy = p.head().getY() + p.head().getBbHeight() - 0.25, h = 0.33;
+            x1 = p.head().getX() - h; x2 = p.head().getX() + h; z1 = p.head().getZ() - h; z2 = p.head().getZ() + h; y1 = cy - h; y2 = cy + h;
+        } else if (p.mob() != null) {
             var bb = p.mob().getBoundingBox();
             x1 = bb.minX - 0.15; y1 = bb.minY - 0.1; z1 = bb.minZ - 0.15; x2 = bb.maxX + 0.15; y2 = bb.maxY + 0.15; z2 = bb.maxZ + 0.15;
         } else {
             x1 = p.x() - 0.6; y1 = p.y() - 1.2; z1 = p.z() - 0.6; x2 = p.x() + 0.6; y2 = p.y() + 0.2; z2 = p.z() + 0.6;
         }
-        var c = Particles.dust(Config.get().pestBoxColor(), 1.6f);
+        var c = Particles.dust(Config.get().pestBoxColor(), 0.9f);
         double[][] corners = {{x1, y1, z1}, {x2, y1, z1}, {x2, y1, z2}, {x1, y1, z2}, {x1, y2, z1}, {x2, y2, z1}, {x2, y2, z2}, {x1, y2, z2}};
         int[][] edges = {{0, 1}, {1, 2}, {2, 3}, {3, 0}, {4, 5}, {5, 6}, {6, 7}, {7, 4}, {0, 4}, {1, 5}, {2, 6}, {3, 7}};
         for (int[] e : edges) {
             double[] a = corners[e[0]], b = corners[e[1]];
-            Particles.dense(c, a[0], a[1], a[2], b[0], b[1], b[2], 0.12 * Perf.slow());
+            Particles.dense(c, a[0], a[1], a[2], b[0], b[1], b[2], 0.08 * Perf.slow());
         }
     }
 

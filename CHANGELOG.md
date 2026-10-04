@@ -1,5 +1,8 @@
 # Changelog
 
+## 8.2.0
+- Fixed event registration (menus overlays + search keys), pest head-only highlight, ultimate enchants by name, prominent lockpick square, sturdier /shards, graphic HOTM/HOTF trees with staged plans.
+
 ## 8.1.1
 - Full check: rarity fallback that never covers items, commands list completed.
 

@@ -27,6 +27,10 @@ public final class Enchants {
     private static final Map<String, int[]> DATA = new ConcurrentHashMap<>();
     private static final Pattern PART = Pattern.compile("^(.+?) ([IVXLC]+|\\d+)$");
     private static final String RAINBOW = "c6eabd";
+    /** Every ultimate enchantment (in case the data file doesn't flag them). */
+    private static final java.util.Set<String> ULTIMATES = java.util.Set.of("bank", "bobbin' time", "chimera", "combo", "duplex",
+            "fatal tempo", "flash", "flowstate", "habanero tactics", "inferno", "last stand", "legion", "no pain no gain",
+            "one for all", "refrigerate", "reiterate", "rend", "soul eater", "swarm", "the one", "ultimate jerry", "ultimate wise", "wisdom");
     private static volatile long lastFetch;
 
     public static int count() { return DATA.size(); }
@@ -112,9 +116,11 @@ public final class Enchants {
             for (String part : parts) {
                 Matcher m = PART.matcher(part.trim());
                 int[] info = m.matches() ? DATA.get(m.group(1).toLowerCase(Locale.ROOT)) : null;
+                if (info == null && m.matches() && ULTIMATES.contains(m.group(1).toLowerCase(Locale.ROOT)))   // ultimate missing from the data file
+                    info = new int[]{0, m.group(1).equalsIgnoreCase("One For All") ? 1 : 5, 1};
                 if (info == null) { allEnchants = false; break; }
                 int lvl = level(m.group(2));
-                boolean ultimate = info[2] == 1;
+                boolean ultimate = info[2] == 1 || ULTIMATES.contains(m.group(1).toLowerCase(Locale.ROOT));
                 String color;
                 if (lvl >= info[1]) color = c.rainbowMaxed ? "rainbow" : c.enchantPerfectColor;
                 else if (info[0] > 0 && lvl > info[0]) color = c.enchantGreatColor;

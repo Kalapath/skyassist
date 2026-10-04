@@ -69,10 +69,17 @@ public final class Shards {
         if (rarity != null) ALL.put(id, new Info(id, name, rarity, attribute, effect.toString().trim()));
     }
 
+    private static final java.util.Set<String> NOT_ATTRIBUTE = java.util.Set.of("PRISMARINE_SHARD", "ECHO_SHARD", "AMETHYST_SHARD", "ENCHANTED_PRISMARINE_SHARD");
+
+    /** Attribute shards: "SHARD" in the ID, name ending in "Shard", and not an ordinary item like Prismarine Shard. */
+    static boolean looksLikeShard(String id, String name) {
+        return id.contains("SHARD") && name.endsWith("Shard") && !NOT_ATTRIBUTE.contains(id) && !name.startsWith("Enchanted ");
+    }
+
     /** From Hypixel's item list (always has every attribute shard and its rarity). Keeps richer item-data info if present. */
     static void fromApi(String id, String name, String tier) {
         String rarity = tier.toUpperCase(Locale.ROOT);
-        if (!PER_LEVEL.containsKey(rarity)) return;
+        if (!PER_LEVEL.containsKey(rarity)) rarity = "UNKNOWN";
         Info old = ALL.get(id);
         ALL.put(id, new Info(id, name, rarity, old != null ? old.attribute() : null, old != null ? old.effect() : ""));
     }
@@ -136,9 +143,12 @@ public final class Shards {
     /** toMax=false: cheapest next level of every attribute. true: cheapest to reach level 10. */
     public static List<Pick> plan(boolean toMax) {
         List<Pick> out = new ArrayList<>();
+        // shards on the Bazaar that no item list told us about: still list them
+        for (String id : Prices.BOOK.keySet()) {
+            if (!ALL.containsKey(id) && looksLikeShard(id, Prices.nameOf(id))) ALL.put(id, new Info(id, Prices.nameOf(id), "UNKNOWN", null, ""));
+        }
         for (Info s : ALL.values()) {
-            int[] table = PER_LEVEL.get(s.rarity());
-            if (table == null) continue;
+            int[] table = PER_LEVEL.getOrDefault(s.rarity(), PER_LEVEL.get("COMMON"));   // unknown rarity: assume common (shown as "?")
             int cur = levels().getOrDefault(s.id(), 0);
             if (cur >= 10) continue;
             int to = toMax ? 10 : cur + 1;
@@ -169,19 +179,21 @@ public final class Shards {
     private static Page page(boolean toMax) {
         List<Row> rows = new ArrayList<>();
         List<String> footer = new ArrayList<>();
-        if (ALL.isEmpty()) footer.add("§7Shard list is still loading (a few seconds after joining). Reopen the menu.");
+        if (ALL.isEmpty()) footer.add(Prices.loaded() ? "§cNo attribute shards found in Hypixel's item list or the Bazaar. Run /profit report and send it."
+                : "§7Prices are still loading (a few seconds after joining). Reopen the menu.");
         int i = 1;
         double total = 0;
         for (Pick p : plan(toMax)) {
             if (i > 300) break;
             if (p.cost() > 0) total += p.cost();
+            boolean unknown = p.shard().rarity().equals("UNKNOWN");
             String hunting = switch (p.shard().rarity()) { case "UNCOMMON" -> "5"; case "RARE" -> "10"; case "EPIC" -> "15"; case "LEGENDARY" -> "20"; default -> "0"; };
             String tip = color(p.shard().rarity()) + p.shard().name() + " §7(" + p.shard().rarity().toLowerCase() + ")"
                     + (p.shard().attribute() != null ? "\n§f" + p.shard().attribute() : "")
                     + (!p.shard().effect().isEmpty() ? "\n§7" + p.shard().effect() : "")
                     + "\n§7Level " + p.from() + " → " + p.to() + ": " + p.shardsNeeded() + " shards"
                     + "\n§8Needs Hunting " + hunting + " to syphon";
-            rows.add(new Row(new String[]{"§8" + i++ + ". " + color(p.shard().rarity()) + p.shard().name(),
+            rows.add(new Row(new String[]{"§8" + i++ + ". " + color(p.shard().rarity()) + p.shard().name() + (unknown ? " §8(rarity ?)" : ""),
                     "§f" + (p.shard().attribute() != null ? p.shard().attribute() : ""), "§7Lv " + p.from() + "→" + p.to(),
                     "§f" + p.shardsNeeded(), p.cost() < 0 ? "§8not on Bazaar" : "§6" + Fmt.coins(p.cost()),
                     p.cost() < 0 ? "" : "§8" + Fmt.coins(p.cost() / (p.to() - p.from())) + "/lvl"}, tip,
