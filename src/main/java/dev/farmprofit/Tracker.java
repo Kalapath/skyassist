@@ -333,6 +333,7 @@ public final class Tracker {
         Perf.run("Lockpick helper", () -> Lockpick.tick(mc));
         Perf.run("Diana burrows", () -> DianaBurrows.tick(mc));
         Perf.run("Fishing bite alert", () -> FishingAlert.tick(mc));
+        Perf.run("Fishing extras", () -> FishingExtras.tick(mc));
         Perf.run("Waypoints", () -> Waypoints.tick(mc));
         Perf.run("Greenhouse unlocks", () -> Greenhouse.noticeInventory(mc));
         Perf.run("Quiz data", () -> WorldPuzzles.quizTick());
@@ -365,10 +366,11 @@ public final class Tracker {
             // Something gained in the same tick (compactor, crafting): treat as a conversion, keep it net.
             // Only losses: you used it up (potion, arrows, a visitor's request) -> "Spent".
             for (var d : deltas.entrySet()) {
+                if (d.getValue() > 0 && !anyLoss(deltas) && !Attribution.counts(target, d.getKey(), Config.get().attributionSeconds * 1000L)) continue;  // not from this activity
                 if (anyGain || d.getValue() > 0) target.addItem(d.getKey(), d.getValue());
                 // the crops / ores themselves (and their enchanted forms) leaving the inventory are moved, crafted
                 // or put in sacks, not used up: keep them as a negative amount instead of "Spent"
-                else if (Items.isTracked(d.getKey())) target.addItem(d.getKey(), d.getValue());
+                else if (Items.isTracked(d.getKey())) { target.addItem(d.getKey(), d.getValue()); Attribution.usedUpAt = System.currentTimeMillis(); }
                 else target.addSpent(d.getKey(), -d.getValue());
             }
             if (anyGain && inMenu) Menus.onGainedInMenu(target);
@@ -605,6 +607,12 @@ public final class Tracker {
         return null;
     }
 
+    /** A loss in the same tick means a conversion (compactor / crafting): keep it net, don't filter it. */
+    private static boolean anyLoss(java.util.Map<String, Integer> deltas) {
+        for (int v : deltas.values()) if (v < 0) return true;
+        return false;
+    }
+
     public static long number(String s) {
         if (s == null) return -1;
         Matcher m = NUMBER.matcher(s);
@@ -790,8 +798,9 @@ public final class Tracker {
                     }
                     continue;
                 }
-                target.addItem(m.group(2).trim(), amount);
                 Greenhouse.noticeName(m.group(2).trim());
+                if (!Attribution.counts(target, m.group(2).trim(), 35_000)) continue;     // sack lines cover the last 30 s
+                target.addItem(m.group(2).trim(), amount);
             }
         }
     }

@@ -51,6 +51,31 @@ Open chat (**T**). While chat is open:
 Detected automatically from your purse on the sidebar when a quest starts (handles Aatrox discounts etc.).
 If you'd rather use a fixed number, set `slayerQuestCost` in the config (anything above 0 overrides auto-detection).
 
+## New in 8.4.3
+- Greenhouse: all 40 mutations — added the missing Legendaries Devourer, Glasscorn, Phantomleaf, Timestalk, Godseed
+  (special: every positive effect) and Jerryflower (from a Fertilized Jerryseed).
+
+## New in 8.4.2
+- Personal Compactor: raw items it uses up no longer show as negative numbers on the HUD (they still count in profit, so
+  the total stays exact), and the compacted item always counts even if it arrives a few seconds later or in your sacks.
+
+## New in 8.4.1
+- Greenhouse unlocks read the Mutations Sack exactly as Hypixel words it: "LOCKED" / "Discover this mutation…" =
+  not found; a "Stored: N/64" line = found (even with 0 stored). Opening the sack corrects wrong marks both ways.
+
+## New in 8.4
+- **Fishing HUD only for real fishing rods**: rods whose rarity line says "FISHING ROD" (a Grappling Hook, Soul Whip,
+  Flaming Flay... no longer start a fishing session).
+- **Only what the activity gave counts**: items count for a profit HUD if they're that activity's own items or arrived
+  within a few seconds of your last action (break, catch, hit...). Trades, other people's drops etc. don't count.
+  Settings → General: on/off and the window.
+- **Fishing extras** (like SkyHanni): bobber timer, your living sea creatures (count + oldest), a ding at your cap,
+  and a rare sea creature alert with [Share with party].
+- **Visitor shopping list**: opening a Garden visitor lists what they want; [Bazaar] opens the item and copies the
+  amount you still need (you place the order).
+- **Greenhouse**: every menu showing mutations is saved to `config/skyassist/greenhouse-menus.txt` so the unlock
+  reading can be matched to Hypixel's real wording.
+
 ## New in 8.3.2
 - /shards reads the real Attribute Menu format: "Source: Mist Shard (C2)" links the attribute to its shard,
   "Attribute Level: 8", and Hypixel's own "Syphon 8 shards to level up!" / "Syphon 32 shards to max!" numbers

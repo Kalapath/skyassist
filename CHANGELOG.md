@@ -1,5 +1,17 @@
 # Changelog
 
+## 8.4.3
+- Greenhouse: added Devourer, Glasscorn, Phantomleaf, Timestalk, Godseed, Jerryflower.
+
+## 8.4.2
+- Compactor: no negative item lines; compacted results always counted.
+
+## 8.4.1
+- Greenhouse: found/locked from the Mutations Sack wording (Stored 0 counts as found), corrects both ways.
+
+## 8.4.0
+- Real fishing rods only, per-activity item attribution, fishing extras (bobber, sea creatures, rare alert), visitor Bazaar list, greenhouse diagnostics.
+
 ## 8.3.2
 - /shards uses the Attribute Menu's Source / Attribute Level / Syphon numbers directly.
 

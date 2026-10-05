@@ -35,8 +35,14 @@ public final class Config {
     public String glowStyle = "auto";
     @Setting(category = "General", label = "Count purse coins", desc = "Coins that go straight into your purse while you're active (Bountiful reforge, mob coins, Midas, coin catches...) count as profit. Read from the sidebar; menus are ignored so selling / bank don't count.")
     public boolean trackPurse = true;
+    @Setting(category = "General", label = "Only count what the activity gave", desc = "Items count for a profit HUD only if they're that activity's own items or arrived right after you did it (not trades, other people's drops, etc.).")
+    public boolean strictAttribution = true;
+    @Setting(category = "General", label = "Activity window (s)", desc = "How long after your last action (break, catch, hit...) a new item still counts.", min = 1, max = 30)
+    public int attributionSeconds = 4;
     @Setting(category = "HUD", label = "Show purse coins line", desc = "The 'Purse coins: +X (Bountiful, mob coins...)' line. Off = still counted in profit, just not listed.")
     public boolean hudShowPurse = false;
+    @Setting(category = "HUD", label = "Hide used-up items", desc = "Don't list items with a negative amount (raw items a compactor turned into enchanted ones). They still count in profit.")
+    public boolean hideNegativeItems = true;
     @Setting(category = "General", label = "Number format", desc = "compact = 1.2M, full = 1,234,567.", options = {"compact", "full"})
     public String numberFormat = "compact";
     @Setting(category = "HUD", label = "Background opacity", desc = "0 = invisible, 255 = solid black.", min = 0, max = 255)
@@ -87,6 +93,8 @@ public final class Config {
     public boolean contestAlert = true;
     @Setting(category = "Farming", label = "Contest standing on HUD", desc = "During a Jacob's contest: your collected amount and medal bracket (from the sidebar) on the Farming HUD.")
     public boolean showContestStanding = true;
+    @Setting(category = "Farming", label = "Visitor shopping list", desc = "Opening a visitor lists what they want with a [Bazaar] link per item (opens it and copies the amount you still need).")
+    public boolean visitorBazaar = true;
     @Setting(category = "Mining", label = "Show mining stats", desc = "Mining Speed / Fortune lines (needs the Stats tab widget).")
     public boolean mineShowStats = true;
     @Setting(category = "Mining", label = "Show powder", desc = "Powder gained and per hour.")
@@ -129,6 +137,10 @@ public final class Config {
     public boolean glowSeaCreatures = true;
     @Setting(category = "Fishing", label = "Bite alert", desc = "A ding and a big \"REEL IN!\" on the HUD when Hypixel shows !!! over your bobber.")
     public boolean fishingAlert = true;
+    @Setting(category = "Fishing", label = "Bobber timer & sea creatures", desc = "Bobber timer, your living sea creatures (count + oldest), rare sea creature alert with a share button.")
+    public boolean fishingExtras = true;
+    @Setting(category = "Fishing", label = "Sea creature warning at", desc = "Ding when this many of your sea creatures are alive (0 = off).", min = 0, max = 60)
+    public int fishingCreatureCap = 10;
     @Setting(category = "Fishing", label = "Show location", desc = "Where you're fishing.")
     public boolean fishShowLocation = true;
     @Setting(category = "Fishing", label = "Show trophy fish", desc = "Trophy fish by type.")

@@ -112,6 +112,20 @@ public final class Greenhouse {
         m("Zombud", "EPIC", "Soul Sand", 1, "Dead Plant", 4, "Cindershade", 2, "Fleshtrap", 2);
         // LEGENDARY
         m("All-in Aloe", "LEGENDARY", "Sand", 1, "Magic Jellybean", 6, "PlantBoy Advance", 2);
+        m("Devourer", "LEGENDARY", "Farmland", 1, "Puffercloud", 4, "Zombud", 4);
+        m("Glasscorn", "LEGENDARY", "Sand", 2, "Chloronite", 6, "Startlevine", 6);
+        m("Phantomleaf", "LEGENDARY", "Soul Sand", 1, "Chorus Fruit", 4, "Shellfruit", 4);
+        m("Timestalk", "LEGENDARY", "End Stone", 1, "Stoplight Petal", 4, "Chorus Fruit", 2, "Shellfruit", 2);
+        // Godseed: no fixed recipe. The listed crops are the wiki's no-watering way to get every positive effect.
+        ALL.put("Godseed", new Mutation("Godseed", "LEGENDARY", "Farmland", 3, new LinkedHashMap<>(Map.of(
+                "Shadevine", 1, "Thornshade", 1, "Gloomgourd", 1, "Cocoa Beans", 1, "Red Mushroom", 1)),
+                "Needs EVERY positive crop effect at its highest tier (yield and XP +30%, water +100%) around an empty 3x3. "
+                        + "Wiki tip: Shadevine, Thornshade, Gloomgourd, Cocoa Beans and Red or Brown Mushroom do it without watering. "
+                        + "A Snoozling placed there shows if it's met."));
+        // Jerryflower: not grown from crops at all
+        ALL.put("Jerryflower", new Mutation("Jerryflower", "LEGENDARY", "Farmland", 1, new LinkedHashMap<>(),
+                "Plant a Fertilized Jerryseed: Jerryseed from a Jerry visitor → Xalx (Crystal Hollows) → reforge it Dirty → Dirt Guy. "
+                        + "At growth stage 5 feed it 10 Move Jerry. (It can't go in the Mutations Sack, so mark it with \"I have it\".)"));
     }
 
     // ---------------- which ones you have ----------------
@@ -155,19 +169,60 @@ public final class Greenhouse {
      * (The Mutations Sack lists every mutation, including ones you've never had, with Stored: 0.)
      */
     static void noticeItems(List<ItemStack> items, boolean inventory) {
-        int seen = 0, added = 0;
+        int seen = 0, added = 0, removed = 0;
+        StringBuilder dump = new StringBuilder();
         for (ItemStack is : items) {
             String n = Tracker.strip(is.getHoverName().getString()).replaceAll("^\\d+x ", "").replaceAll(" x\\d+$", "").trim();
             if (!ALL.containsKey(n)) continue;
             seen++;
+            if (!inventory) {
+                Boolean found = foundFromLore(ItemIds.lore(is));
+                if (found != null) {
+                    if (found && have().add(n)) added++;
+                    if (!found && have().remove(n)) removed++;
+                    if (!found || !inventory) { dumpItem(dump, n, is); continue; }
+                }
+            }
+            if (!inventory) {
+                dump.append("[").append(n).append("]\n");
+                for (String l : ItemIds.lore(is)) dump.append("   ").append(l).append('\n');
+            }
             if (have().contains(n)) continue;
             if (inventory || ownedFromLore(ItemIds.lore(is))) { have().add(n); added++; }
         }
-        if (added > 0) save();
+        if (added > 0 || removed > 0) save();
+        if (!inventory && seen > 0) {
+            try {
+                java.nio.file.Files.createDirectories(Config.DIR);
+                java.nio.file.Files.writeString(Config.DIR.resolve("greenhouse-menus.txt"), "=== " + new java.util.Date() + " ===\n" + dump,
+                        java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
+            } catch (Exception ignored) {}
+        }
         if (!inventory && seen >= 3 && Config.get().greenhouseGuide) {
             Tracker.say("§a[Greenhouse] §7Read " + seen + " mutations here" + (added > 0 ? ", §f" + added + " newly unlocked" : "")
+                    + (removed > 0 ? ", §c" + removed + " corrected to locked" : "")
                     + "§7. You have §f" + have().size() + "§7/" + ALL.size() + ". §8(Wrong? /greenhouse → I have it / Unmark)");
         }
+    }
+
+    /**
+     * Mutations Sack (Hypixel's wording): a mutation you haven't found says "LOCKED" and "Discover this mutation in the
+     * Greenhouse to unlock it here."; one you have found shows "Stored: 0/64" (any number, even 0).
+     * Returns true / false, or null if this item doesn't say either way.
+     */
+    private static Boolean foundFromLore(List<String> lore) {
+        boolean stored = false;
+        for (String l : lore) {
+            String t = l.trim();
+            if (t.equals("LOCKED") || t.startsWith("Discover this mutation") || t.contains("to unlock it here")) return false;
+            if (STORED.matcher(t).find()) stored = true;
+        }
+        return stored ? Boolean.TRUE : null;
+    }
+
+    private static void dumpItem(StringBuilder dump, String n, ItemStack is) {
+        dump.append("[").append(n).append("]\n");
+        for (String l : ItemIds.lore(is)) dump.append("   ").append(l).append('\n');
     }
 
     /** Lore decides: "Stored: 5" = have it, "Stored: 0" / locked / ??? = don't, "Unlocked" / "Analyzed" = have it. */

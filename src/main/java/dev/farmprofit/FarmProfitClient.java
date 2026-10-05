@@ -104,8 +104,9 @@ public final class FarmProfitClient implements ClientModInitializer {
                 var stack = player.getItemInHand(hand);
                 if (Tracker.strip(stack.getHoverName().getString()).contains("Ancestral Spade")) {
                     DianaBurrows.onSpade(player.getX(), player.getY(), player.getZ());
-                } else if (stack.getItem() instanceof FishingRodItem) {
+                } else if (stack.getItem() instanceof FishingRodItem && FishingRods.isRealRod(stack)) {
                     Tracker.onRodUse();
+                    FishingExtras.onCast();
                 } else if (!Tracker.MINING.equals(Tracker.area) && !Tracker.FORAGING.equals(Tracker.area)) {
                     String name = Tracker.strip(stack.getHoverName().getString());
                     if (name.contains("Vacuum")) Tracker.onVacuum();
@@ -296,6 +297,15 @@ public final class FarmProfitClient implements ClientModInitializer {
             dispatcher.register(ClientCommands.literal("skyassist")
                     .executes(ctx -> { MenuScreen.open(ProfitMenus::hub); return 1; })
                     .then(ClientCommands.literal("help").executes(ctx -> { MenuScreen.open(() -> Commands.screen(null)); return 1; }))
+                    .then(ClientCommands.literal("bzbuy").then(ClientCommands.argument("amount", IntegerArgumentType.integer(1))
+                            .then(ClientCommands.argument("item", StringArgumentType.greedyString()).executes(ctx -> {
+                                int n = IntegerArgumentType.getInteger(ctx, "amount");
+                                String item = StringArgumentType.getString(ctx, "item");
+                                Chat.copy(String.valueOf(n));           // paste it into the amount sign
+                                Reflect.call(Minecraft.getInstance().getConnection(), "sendCommand", "bz " + item);
+                                Tracker.say("§a[Visitor] §fBuy §a" + n + "x §f" + item + " §7— amount copied (Ctrl+V in the amount sign).");
+                                return 1;
+                            }))))
                     .then(ClientCommands.literal("settings").executes(ctx -> { SettingsScreen.requestOpen(); return 1; }))
                     .then(ClientCommands.literal("gui").executes(ctx -> { GuiEditor.open(); return 1; }))
                     .then(ClientCommands.literal("setup").executes(ctx -> { SetupScreen.requestOpen(); return 1; })));

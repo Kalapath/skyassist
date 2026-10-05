@@ -68,7 +68,7 @@ public final class Hud {
         if (cfg.hudShowTitle) out.add(s.isCombat() && s.grind != null ? "§5§l✦ " + s.grind + " grind" : title(type));
         if (cfg.hudShowTime) out.add("§7Time: §f" + Fmt.duration(s.durationMs(now)));
         if (s.isCombat()) { String boss = Glow.bossLine(); if (boss != null) out.add(boss); addCombatLines(out, s, now); }
-        if (s.isFishing()) FishingAlert.addHudLines(out);
+        if (s.isFishing()) { FishingAlert.addHudLines(out); FishingExtras.addHudLines(out); }
         if (s.isMining()) { Mineshafts.addHudLines(out); PowderChests.addHudLines(out, s); }
         if (details) addActivityLine(out, s, now);
         if (s.isCombat() && cfg.combatShowBosses && (s.totalBreaks() > 0 || s.slayerQuests > 0)) addBossLine(out, s, now);
@@ -481,6 +481,9 @@ public final class Hud {
         var items = new ArrayList<>(s.items.entrySet());
         items.removeIf(e -> Session.ignored(e.getKey()));
         if (s.rareDrops != null) items.removeIf(e -> s.rareDrops.containsKey(e.getKey()));   // shown under Rare drops
+        // a negative amount is raw material a compactor / crafting turned into something else: the result is listed,
+        // the raw part only stays in the profit math (so the total is right) instead of showing as "-160 Wheat"
+        if (Config.get().hideNegativeItems) items.removeIf(e -> e.getValue() < 0);
         items.sort((a, b) -> Double.compare(b.getValue() * Prices.price(b.getKey()), a.getValue() * Prices.price(a.getKey())));
         return items;
     }
