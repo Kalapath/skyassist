@@ -125,8 +125,13 @@ public final class InvSearch {
         return Integer.MIN_VALUE;
     }
 
-    /** Called after a menu is drawn: highlight matches, dim the rest. */
-    static void draw(Object screen, Object g) {
+    /** Behind the items: matches get a green background, everything else a dark one. */
+    static void drawBehind(Object screen, Object g) { draw(screen, g, false); }
+
+    /** In front: a bright green frame around each match (the frame sits around the slot, never over the item). */
+    static void drawFront(Object screen, Object g) { draw(screen, g, true); }
+
+    private static void draw(Object screen, Object g, boolean front) {
         if (!active() || !isContainer(screen)) return;
         String q = term.toLowerCase(Locale.ROOT).trim();
         int left = intField(screen, "leftPos"), top = intField(screen, "topPos");
@@ -139,13 +144,15 @@ public final class InvSearch {
             int sx = intField(slot, "x"), sy = intField(slot, "y");
             if (sx == Integer.MIN_VALUE || !(st instanceof ItemStack stack) || stack.isEmpty()) continue;
             int x = left + sx, y = top + sy;
-            if (matches(stack, q)) {
-                Reflect.call(g, "fill", x - 1, y - 1, x + 17, y + 1, 0xFF55FF55);          // thick bright green frame
-                Reflect.call(g, "fill", x - 1, y + 15, x + 17, y + 17, 0xFF55FF55);
-                Reflect.call(g, "fill", x - 1, y + 1, x + 1, y + 15, 0xFF55FF55);
-                Reflect.call(g, "fill", x + 15, y + 1, x + 17, y + 15, 0xFF55FF55);
+            boolean hit = matches(stack, q);
+            if (front) {
+                if (!hit) continue;
+                Reflect.call(g, "fill", x - 1, y - 1, x + 17, y, 0xFF55FF55);            // frame just outside the item
+                Reflect.call(g, "fill", x - 1, y + 16, x + 17, y + 17, 0xFF55FF55);
+                Reflect.call(g, "fill", x - 1, y, x, y + 16, 0xFF55FF55);
+                Reflect.call(g, "fill", x + 16, y, x + 17, y + 16, 0xFF55FF55);
             } else {
-                Reflect.call(g, "fill", x, y, x + 16, y + 16, 0xC8101010);
+                Reflect.call(g, "fill", x, y, x + 16, y + 16, hit ? 0xC033DD33 : 0xE0141414);
             }
         }
     }

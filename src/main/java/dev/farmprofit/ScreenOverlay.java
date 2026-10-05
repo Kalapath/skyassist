@@ -14,8 +14,16 @@ final class ScreenOverlay {
     /** True if rarity colors could be drawn behind items (afterBackground event found). */
     static Boolean behindWorks;
 
+    /** Things that go BEHIND the items (colored slot backgrounds): rarity, search match / dim, terminal highlights. */
+    private static void drawBehind(Object screen, Object g) {
+        Perf.run("Rarity colors", () -> RarityBg.drawBehind(screen, g));
+        Perf.run("Inventory search", () -> InvSearch.drawBehind(screen, g));
+        Perf.run("Terminal solvers", () -> Terminals.draw(screen, g));
+    }
+
     static void register(Object screen) {
-        behindWorks = null;
+        // after the menu background, before items and tooltips: colors land under the items, tooltips stay on top
+        behindWorks = hook(screen, new String[]{"afterBackground", "afterExtractBackground", "afterRenderBackground"}, ScreenOverlay::drawBehind);
         try {
             Class<?> events = Class.forName("net.fabricmc.fabric.api.client.screen.v1.ScreenEvents");
             for (Method m : events.getMethods()) {
@@ -33,13 +41,10 @@ final class ScreenOverlay {
                         };
                     }
                     if (args != null && args.length >= 2) {
-                        final int mx = args.length > 2 && args[2] instanceof Integer i ? i : -999, my = args.length > 3 && args[3] instanceof Integer j ? j : -999;
-                        // new drawing layer, so everything below lands on top of the menu's own items
-                        Reflect.call(args[1], new String[]{"nextStratum", "createNewRootLayer"});
-                        Perf.run("Rarity colors", () -> RarityBg.drawMenu(args[0], args[1], mx, my));
-                        Perf.run("Item labels", () -> ItemLabels.draw(args[0], args[1]));
-                        Perf.run("Terminal solvers", () -> Terminals.draw(args[0], args[1]));
-                        Perf.run("Inventory search", () -> InvSearch.draw(args[0], args[1]));
+                        // no new layer here: anything in a new layer would cover the tooltip
+                        if (behindWorks != Boolean.TRUE) drawBehind(args[0], args[1]);       // fallback if the background event is missing
+                        Perf.run("Inventory search", () -> InvSearch.drawFront(args[0], args[1]));   // green frames around matches
+                        Perf.run("Item labels", () -> ItemLabels.draw(args[0], args[1]));            // text always draws above items
                     }
                     return null;
                 });

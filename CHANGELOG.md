@@ -1,5 +1,11 @@
 # Changelog
 
+## 8.3.0
+- /shards: subtracts syphoned progress + Hunting Box shards; Bazaar button copies the amount to buy.
+
+## 8.2.1
+- Colors behind items via the background event (tooltips on top), rarity found in the whole description.
+
 ## 8.2.0
 - Fixed event registration (menus overlays + search keys), pest head-only highlight, ultimate enchants by name, prominent lockpick square, sturdier /shards, graphic HOTM/HOTF trees with staged plans.
 

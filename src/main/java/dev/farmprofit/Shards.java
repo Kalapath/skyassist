@@ -38,7 +38,8 @@ public final class Shards {
     private static final Pattern ATTR_NAME = Pattern.compile("^(.+?)\\s+([IVX]+|\\d+)$");
 
     public record Info(String id, String name, String rarity, String attribute, String effect) {}
-    public record Pick(Info shard, int from, int to, int shardsNeeded, double cost) {}
+    /** shardsNeeded = for the levels; have = already syphoned into this level + owned in the Hunting Box; toBuy = what's left. */
+    public record Pick(Info shard, int from, int to, int shardsNeeded, int have, int toBuy, double cost) {}
 
     private static final Map<String, Info> ALL = new ConcurrentHashMap<>();
     private static final Path FILE = Config.DIR.resolve("attributes.json");
@@ -117,18 +118,55 @@ public final class Shards {
             Info info = id != null ? ALL.get(id) : null;
             if (info == null) for (Info i : ALL.values()) if (i.name().equals(name) || (i.attribute() != null && name.startsWith(i.attribute()))) { info = i; break; }
             if (info == null) continue;
-            int level = -1;
+            List<String> lore = ItemIds.lore(is);
+            if (title.contains("Hunting Box")) {
+                // shards you own but haven't used yet: the stack size, or an "Owned / Amount / Stored: N" line
+                int owned = is.getCount();
+                for (String l : lore) {
+                    Matcher m = OWNED.matcher(l);
+                    if (m.find()) { owned = Integer.parseInt(m.group(1).replace(",", "")); break; }
+                }
+                changed |= put(info.id() + "#owned", owned);
+                continue;
+            }
+            int level = -1, used = -1;
             Matcher n = ATTR_NAME.matcher(name);
             if (n.matches() && !name.endsWith("Shard")) level = roman(n.group(2));
-            for (String l : ItemIds.lore(is)) {
+            for (String l : lore) {
                 Matcher m = LEVEL.matcher(l);
-                if (m.find()) { level = roman(m.group(1)); break; }
+                if (level < 0 && m.find()) level = roman(m.group(1));
+                // progress toward the next level: "12/24" on a line about shards / syphoning / progress
+                String low = l.toLowerCase(Locale.ROOT);
+                Matcher pr = PROGRESS.matcher(l);
+                if (used < 0 && (low.contains("shard") || low.contains("syphon") || low.contains("progress")) && pr.find())
+                    used = Integer.parseInt(pr.group(1).replace(",", ""));
+                // or a running total ("Syphoned: 37"): work out the level and what's left over from the table
+                Matcher tot = TOTAL.matcher(l);
+                if (used < 0 && tot.find()) {
+                    int total = Integer.parseInt(tot.group(1).replace(",", ""));
+                    int[] table = PER_LEVEL.getOrDefault(info.rarity(), PER_LEVEL.get("COMMON"));
+                    int lv = 0;
+                    while (lv < 10 && total >= table[lv]) { total -= table[lv]; lv++; }
+                    if (level < 0) level = lv;
+                    used = lv < 10 ? total : 0;
+                }
             }
-            if (level >= 0 && level <= 10 && !Integer.valueOf(level).equals(levels().get(info.id()))) { levels().put(info.id(), level); changed = true; }
+            if (level >= 0 && level <= 10) changed |= put(info.id(), level);
+            if (used >= 0) changed |= put(info.id() + "#used", used);
         }
         if (changed) {
             try { Files.createDirectories(Config.DIR); Files.writeString(FILE, Config.GSON.toJson(levels)); } catch (Exception ignored) {}
         }
+    }
+
+    private static final Pattern OWNED = Pattern.compile("(?:Owned|Amount|Stored|You have):?\\s*([\\d,]+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PROGRESS = Pattern.compile("([\\d,]+)\\s*/\\s*([\\d,]+)");
+    private static final Pattern TOTAL = Pattern.compile("(?:Syphoned|Shards used|Total shards):?\\s*([\\d,]+)", Pattern.CASE_INSENSITIVE);
+
+    private static boolean put(String key, int value) {
+        if (Integer.valueOf(value).equals(levels().get(key))) return false;
+        levels().put(key, value);
+        return true;
     }
 
     // ---------------- planning ----------------
@@ -154,8 +192,11 @@ public final class Shards {
             int to = toMax ? 10 : cur + 1;
             int need = 0;
             for (int l = cur; l < to; l++) need += table[l];
+            // already syphoned into the current level + unused shards in the Hunting Box
+            int have = levels().getOrDefault(s.id() + "#used", 0) + levels().getOrDefault(s.id() + "#owned", 0);
+            int toBuy = Math.max(0, need - have);
             double each = buyPrice(s.id());
-            out.add(new Pick(s, cur, to, need, each <= 0 ? -1 : need * each));
+            out.add(new Pick(s, cur, to, need, have, toBuy, each <= 0 ? -1 : toBuy * each));
         }
         // priced ones first (cheapest per level), then shards nobody sells on the Bazaar
         out.sort((a, b) -> {
@@ -192,18 +233,27 @@ public final class Shards {
                     + (p.shard().attribute() != null ? "\n§f" + p.shard().attribute() : "")
                     + (!p.shard().effect().isEmpty() ? "\n§7" + p.shard().effect() : "")
                     + "\n§7Level " + p.from() + " → " + p.to() + ": " + p.shardsNeeded() + " shards"
+                    + (p.have() > 0 ? "\n§7You already have §f" + p.have() + " §8(syphoned into this level + in your Hunting Box)" : "")
+                    + "\n§aTo buy: " + p.toBuy()
                     + "\n§8Needs Hunting " + hunting + " to syphon";
             rows.add(new Row(new String[]{"§8" + i++ + ". " + color(p.shard().rarity()) + p.shard().name() + (unknown ? " §8(rarity ?)" : ""),
                     "§f" + (p.shard().attribute() != null ? p.shard().attribute() : ""), "§7Lv " + p.from() + "→" + p.to(),
-                    "§f" + p.shardsNeeded(), p.cost() < 0 ? "§8not on Bazaar" : "§6" + Fmt.coins(p.cost()),
+                    p.have() > 0 ? "§f" + p.toBuy() + " §8(" + p.shardsNeeded() + "−" + p.have() + ")" : "§f" + p.toBuy(),
+                    p.toBuy() == 0 ? "§aenough!" : p.cost() < 0 ? "§8not on Bazaar" : "§6" + Fmt.coins(p.cost()),
                     p.cost() < 0 ? "" : "§8" + Fmt.coins(p.cost() / (p.to() - p.from())) + "/lvl"}, tip,
-                    List.of(new Action("§eBazaar", "Opens " + p.shard().name() + " in the Bazaar.", () -> MenuScreen.runCommand("bz " + p.shard().name())))));
+                    List.of(new Action("§eBazaar", "Opens " + p.shard().name() + " in the Bazaar and copies the amount to buy (" + p.toBuy()
+                            + ") so you can paste it into the amount sign.", () -> {
+                        Chat.copy(String.valueOf(p.toBuy()));
+                        MenuScreen.runCommand("bz " + p.shard().name());
+                        Tracker.say("§6[Shards] §fBuy §a" + p.toBuy() + "x §f" + p.shard().name() + " §7— amount copied, paste it with Ctrl+V in the amount sign.");
+                    }))));
         }
         footer.add("§7Cheapest first (coins per attribute level, Bazaar buy price).");
-        footer.add(levels().isEmpty() ? "§eOpen your Attribute Menu (/am) or Hunting Box once so your current levels are known."
+        footer.add(levels().keySet().stream().noneMatch(k -> !k.contains("#")) ? "§eOpen your Attribute Menu (/am) or Hunting Box once so your current levels are known."
                 : "§8Your levels are from the last time you opened the Attribute Menu / Hunting Box.");
         footer.add("§8Search the box above by attribute or effect, e.g. \"Farming Fortune\" or \"Sweep\".");
-        return new Page(new String[]{"Shard", "Attribute", "Level", "Shards", "Cost", ""}, new int[]{130, 110, 50, 45, 55, 50}, rows, List.of(), footer);
+        footer.add("§8Shards already syphoned into a level and unused shards in your Hunting Box are subtracted (open both once).");
+        return new Page(new String[]{"Shard", "Attribute", "Level", "To buy", "Cost", ""}, new int[]{125, 105, 45, 65, 55, 45}, rows, List.of(), footer);
     }
 
     private Shards() {}

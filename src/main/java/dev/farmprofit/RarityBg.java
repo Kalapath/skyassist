@@ -12,7 +12,8 @@ import java.util.regex.Pattern;
 
 /** Colors each item's slot by its SkyBlock rarity, in menus and on the hotbar. */
 public final class RarityBg {
-    private static final Pattern RARITY = Pattern.compile("\\b(VERY SPECIAL|SPECIAL|ULTIMATE|DIVINE|MYTHIC|LEGENDARY|EPIC|RARE|UNCOMMON|COMMON|ADMIN)\\b");
+    /** A rarity line: the rarity word, then optionally the item type in capitals ("LEGENDARY SWORD", "a RARE ACCESSORY a"). */
+    private static final Pattern RARITY = Pattern.compile("^(?:a )?(VERY SPECIAL|SPECIAL|ULTIMATE|DIVINE|MYTHIC|LEGENDARY|EPIC|RARE|UNCOMMON|COMMON|ADMIN)(?: [A-Z][A-Z ]*)?(?: a)?$");
     private static final Map<ItemStack, Integer> CACHE = new WeakHashMap<>();
 
     /** RGB of the item's rarity (Hypixel's colors), or -1 if it has none. */
@@ -22,8 +23,8 @@ public final class RarityBg {
         if (c != null) return c;
         int found = -1;
         List<String> lore = ItemIds.lore(stack);
-        for (int i = lore.size() - 1; i >= 0 && i >= lore.size() - 3 && found < 0; i--) {
-            Matcher m = RARITY.matcher(lore.get(i));
+        for (int i = lore.size() - 1; i >= 0 && found < 0; i--) {                 // whole description, bottom up
+            Matcher m = RARITY.matcher(lore.get(i).trim());
             if (m.find()) found = switch (m.group(1)) {
                 case "COMMON" -> 0xFFFFFF;
                 case "UNCOMMON" -> 0x55FF55;
@@ -68,26 +69,23 @@ public final class RarityBg {
         return true;
     }
 
-    /** Menus: a colored square in every slot with a rarity, with the item drawn again on top of it. */
-    static void drawMenu(Object screen, Object g, int mouseX, int mouseY) {
+    /** Menus: a colored square under every item with a rarity (drawn before the items, so items and tooltips stay on top). */
+    static void drawBehind(Object screen, Object g) {
         if (!Config.get().rarityBackground) return;
         int left = intField(screen, "leftPos"), top = intField(screen, "topPos");
         if (left == Integer.MIN_VALUE) return;
         Object slots = Reflect.field(Reflect.call(screen, "getMenu"), "slots");
         if (!(slots instanceof List<?> list)) return;
+        boolean searching = InvSearch.active();
         for (Object slot : list) {
             Object st = Reflect.call(slot, "getItem");
             if (!(st instanceof ItemStack stack)) continue;
             int c = color(stack);
             if (c < 0) continue;
+            if (searching && !InvSearch.matches(stack)) continue;                 // search darkens these instead
             int sx = intField(slot, "x"), sy = intField(slot, "y");
             if (sx == Integer.MIN_VALUE) continue;
-            int x = left + sx, y = top + sy;
-            if (mouseX >= x && mouseX < x + 16 && mouseY >= y && mouseY < y + 16) continue;   // keep the hover highlight
-            if (InvSearch.active() && !InvSearch.matches(stack)) continue;                     // search dims these instead
-            if (canDrawItems == Boolean.FALSE) { Reflect.call(g, "fill", x, y, x + 16, y + 16, argb(c, true)); continue; }
-            Reflect.call(g, "fill", x, y, x + 16, y + 16, argb(c, false));
-            drawItem(g, stack, x, y);
+            Reflect.call(g, "fill", left + sx, top + sy, left + sx + 16, top + sy + 16, argb(c, false));
         }
     }
 

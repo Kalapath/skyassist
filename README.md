@@ -51,6 +51,18 @@ Open chat (**T**). While chat is open:
 Detected automatically from your purse on the sidebar when a quest starts (handles Aatrox discounts etc.).
 If you'd rather use a fixed number, set `slayerQuestCost` in the config (anything above 0 overrides auto-detection).
 
+## New in 8.3
+- **/shards** subtracts what you already have: shards syphoned into the current level (read from the Attribute Menu,
+  as "12/24" progress or a "Syphoned: N" total) and unused shards in your Hunting Box. The list shows **To buy**.
+- Clicking **Bazaar** opens that shard's Bazaar page and **copies the amount to buy** to your clipboard (paste it into the
+  amount sign). The order itself stays your click (automatic Bazaar orders break Hypixel's rules).
+
+## New in 8.2.1
+- Menu colors (rarity, search) are drawn **after the menu background and before the items**, so items sit on the color
+  and **tooltips stay on top** (before, redrawn items poked through tooltips).
+- Rarity is found anywhere in the item's description (shop menus put prices after the rarity line).
+- Search: matches get a green background + frame, everything else a dark background.
+
 ## New in 8.2
 - **Root cause found for menus**: overlays (rarity colors, search highlights, item labels, terminal solvers) and the
   search box's key handling were registered through a Fabric-internal class that Java refuses to call; registration
