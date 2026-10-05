@@ -1,5 +1,11 @@
 # Changelog
 
+## 8.3.2
+- /shards uses the Attribute Menu's Source / Attribute Level / Syphon numbers directly.
+
+## 8.3.1
+- Shards: lore-based shard matching, diagnostics file + chat count, manual Edit / set / reset.
+
 ## 8.3.0
 - /shards: subtracts syphoned progress + Hunting Box shards; Bazaar button copies the amount to buy.
 

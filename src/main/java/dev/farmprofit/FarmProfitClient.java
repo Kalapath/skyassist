@@ -252,7 +252,24 @@ public final class FarmProfitClient implements ClientModInitializer {
             dispatcher.register(ClientCommands.literal("hotm").executes(ctx -> { MenuScreen.open(() -> TreeGuideScreen.hotm(null)); return 1; }));
             dispatcher.register(ClientCommands.literal("hotf").executes(ctx -> { MenuScreen.open(() -> TreeGuideScreen.hotf(null)); return 1; }));
             dispatcher.register(ClientCommands.literal("greenhouse").executes(ctx -> { MenuScreen.open(() -> Greenhouse.screen(null)); return 1; }));
-            dispatcher.register(ClientCommands.literal("shards").executes(ctx -> { MenuScreen.open(() -> Shards.screen(null)); return 1; }));
+            dispatcher.register(ClientCommands.literal("shards").executes(ctx -> { MenuScreen.open(() -> Shards.screen(null)); return 1; })
+                    .then(ClientCommands.literal("reset").executes(ctx -> {
+                        Shards.resetManual();
+                        Tracker.say("§6[Shards] §7Hand-set values cleared; levels come from the Attribute Menu again.");
+                        return 1;
+                    }))
+                    .then(ClientCommands.literal("set").then(ClientCommands.argument("args", StringArgumentType.greedyString()).executes(ctx -> {
+                        String[] w = StringArgumentType.getString(ctx, "args").trim().split("\\s+");
+                        try {
+                            if (w.length < 3) throw new NumberFormatException();
+                            int have = Integer.parseInt(w[w.length - 1]), level = Integer.parseInt(w[w.length - 2]);
+                            String name = String.join(" ", java.util.Arrays.copyOf(w, w.length - 2));
+                            Tracker.say("§6[Shards] " + Shards.set(name, level, have));
+                        } catch (NumberFormatException e) {
+                            Tracker.say("§6[Shards] §7Use: §f/shards set <shard> <level> <have> §7e.g. §f/shards set Grove 3 5");
+                        }
+                        return 1;
+                    }))));
             dispatcher.register(ClientCommands.literal("dungeon")
                     .executes(ctx -> { MenuScreen.open(() -> Dungeon.screen(Dungeon.inDungeon() ? 0 : 3, null)); return 1; })
                     .then(ClientCommands.literal("chat").executes(ctx -> { Dungeon.sayLive(); return 1; }))

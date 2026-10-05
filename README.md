@@ -51,6 +51,17 @@ Open chat (**T**). While chat is open:
 Detected automatically from your purse on the sidebar when a quest starts (handles Aatrox discounts etc.).
 If you'd rather use a fixed number, set `slayerQuestCost` in the config (anything above 0 overrides auto-detection).
 
+## New in 8.3.2
+- /shards reads the real Attribute Menu format: "Source: Mist Shard (C2)" links the attribute to its shard,
+  "Attribute Level: 8", and Hypixel's own "Syphon 8 shards to level up!" / "Syphon 32 shards to max!" numbers
+  (progress already included) are used directly; unused Hunting Box shards are subtracted.
+
+## New in 8.3.1
+- /shards: attribute items are also matched to their shard when the description names it; opening the Attribute Menu /
+  Hunting Box says in chat how many were recognised and saves what was seen to `config/skyassist/shard-menus.txt`.
+- **Edit** button per shard (or `/shards set <shard> <level> <have>`) to fix numbers by hand; hand-set values (✎) win
+  over menu reading until `/shards reset`.
+
 ## New in 8.3
 - **/shards** subtracts what you already have: shards syphoned into the current level (read from the Attribute Menu,
   as "12/24" progress or a "Syphoned: N" total) and unused shards in your Hunting Box. The list shows **To buy**.

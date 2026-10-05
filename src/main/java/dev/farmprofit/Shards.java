@@ -112,13 +112,29 @@ public final class Shards {
     static void scanMenu(String title, List<ItemStack> items) {
         if (!(title.contains("Attribute") || title.contains("Hunting Box"))) return;
         boolean changed = false;
+        int matched = 0;
+        StringBuilder dump = new StringBuilder("=== " + title + " (" + new java.util.Date() + ") ===\n");
         for (ItemStack is : items) {
             String id = ItemIds.of(is);
             String name = Tracker.strip(is.getHoverName().getString());
-            Info info = id != null ? ALL.get(id) : null;
-            if (info == null) for (Info i : ALL.values()) if (i.name().equals(name) || (i.attribute() != null && name.startsWith(i.attribute()))) { info = i; break; }
-            if (info == null) continue;
             List<String> lore = ItemIds.lore(is);
+            dump.append("\n[").append(name).append("] id=").append(id).append('\n');
+            for (String l : lore) dump.append("   ").append(l).append('\n');
+            Info info = id != null ? ALL.get(id) : null;
+            // "Source: Mist Shard (C2)" names the shard the attribute comes from
+            for (String l : lore) {
+                Matcher src = SOURCE.matcher(l);
+                if (info == null && src.find()) info = shardNamed(src.group(1).trim(), rarityIn(lore), attributeName(name));
+            }
+            if (info == null) for (Info i : ALL.values()) if (i.name().equals(name) || (i.attribute() != null && name.startsWith(i.attribute()))) { info = i; break; }
+            if (info == null) {                       // the description names the shard ("Grove Shard", "Source: ...")
+                String all = String.join(" ", lore);
+                Info best = null;
+                for (Info i : ALL.values()) if (all.contains(i.name()) && (best == null || i.name().length() > best.name().length())) best = i;
+                info = best;
+            }
+            if (info == null) continue;
+            matched++;
             if (title.contains("Hunting Box")) {
                 // shards you own but haven't used yet: the stack size, or an "Owned / Amount / Stored: N" line
                 int owned = is.getCount();
@@ -129,6 +145,17 @@ public final class Shards {
                 changed |= put(info.id() + "#owned", owned);
                 continue;
             }
+            // Hypixel's own numbers, progress already included: use them as they are
+            for (String l : lore) {
+                Matcher a = ATTR_LEVEL.matcher(l);
+                if (a.find()) changed |= put(info.id(), Integer.parseInt(a.group(1)));
+                Matcher up = TO_LEVEL.matcher(l);
+                if (up.find()) changed |= put(info.id() + "#toNext", Integer.parseInt(up.group(1).replace(",", "")));
+                Matcher mx = TO_MAX.matcher(l);
+                if (mx.find()) changed |= put(info.id() + "#toMax", Integer.parseInt(mx.group(1).replace(",", "")));
+                if (l.toUpperCase(Locale.ROOT).contains("MAXED") || l.contains("Max Level")) { changed |= put(info.id(), 10); changed |= put(info.id() + "#toNext", 0); changed |= put(info.id() + "#toMax", 0); }
+            }
+            if (levels().containsKey(info.id() + "#toNext")) continue;      // got the exact numbers, no need to guess below
             int level = -1, used = -1;
             Matcher n = ATTR_NAME.matcher(name);
             if (n.matches() && !name.endsWith("Shard")) level = roman(n.group(2));
@@ -154,8 +181,17 @@ public final class Shards {
             if (level >= 0 && level <= 10) changed |= put(info.id(), level);
             if (used >= 0) changed |= put(info.id() + "#used", used);
         }
-        if (changed) {
-            try { Files.createDirectories(Config.DIR); Files.writeString(FILE, Config.GSON.toJson(levels)); } catch (Exception ignored) {}
+        if (changed) save();
+        // 2) what the mod saw, for fixing the reading if Hypixel words things differently
+        try {
+            Files.createDirectories(Config.DIR);
+            Files.writeString(Config.DIR.resolve("shard-menus.txt"), dump.toString(),
+                    java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
+        } catch (Exception ignored) {}
+        if (!title.equals(lastReported)) {
+            lastReported = title;
+            Tracker.say("§6[Shards] §7Read §f" + title + "§7: recognised §f" + matched + "§7 of " + items.size()
+                    + " items. §8(Wrong numbers? Use Edit in /shards, and send config/skyassist/shard-menus.txt)");
         }
     }
 
@@ -163,7 +199,71 @@ public final class Shards {
     private static final Pattern PROGRESS = Pattern.compile("([\\d,]+)\\s*/\\s*([\\d,]+)");
     private static final Pattern TOTAL = Pattern.compile("(?:Syphoned|Shards used|Total shards):?\\s*([\\d,]+)", Pattern.CASE_INSENSITIVE);
 
+    private static final Pattern SOURCE = Pattern.compile("Source:\\s*(.+? Shard)");
+    private static final Pattern RARITY_LINE = Pattern.compile("Rarity:\\s*(COMMON|UNCOMMON|RARE|EPIC|LEGENDARY|MYTHIC)");
+    private static final Pattern ATTR_LEVEL = Pattern.compile("Attribute Level:\\s*(\\d+)");
+    private static final Pattern TO_LEVEL = Pattern.compile("Syphon\\s+([\\d,]+)\\s+shards?\\s+to level up", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TO_MAX = Pattern.compile("Syphon\\s+([\\d,]+)\\s+shards?\\s+to max", Pattern.CASE_INSENSITIVE);
+
+    private static String rarityIn(List<String> lore) {
+        for (String l : lore) { Matcher m = RARITY_LINE.matcher(l); if (m.find()) return m.group(1); }
+        return null;
+    }
+
+    /** "Fog Elemental VIII" -> "Fog Elemental". */
+    private static String attributeName(String itemName) {
+        Matcher n = ATTR_NAME.matcher(itemName);
+        return n.matches() ? n.group(1) : itemName;
+    }
+
+    /** The shard with this name; if no list knows it yet, it's added (its Bazaar ID found by name). */
+    private static Info shardNamed(String shardName, String rarity, String attribute) {
+        for (Info i : ALL.values()) {
+            if (i.name().equalsIgnoreCase(shardName)) {
+                if (i.attribute() == null || "UNKNOWN".equals(i.rarity()))       // fill in what the menu told us
+                    ALL.put(i.id(), new Info(i.id(), i.name(), rarity != null ? rarity : i.rarity(), attribute, i.effect()));
+                return ALL.get(i.id());
+            }
+        }
+        String id = Prices.idFor(shardName);
+        String guess = "SHARD_" + shardName.replace(" Shard", "").toUpperCase(Locale.ROOT).replace(' ', '_').replace("'", "");
+        if ((id == null || Prices.bazaarRaw(id) == null) && Prices.bazaarRaw(guess) != null) id = guess;
+        if (id == null) id = guess;
+        Info info = new Info(id, shardName, rarity != null ? rarity : "UNKNOWN", attribute, "");
+        ALL.put(id, info);
+        return info;
+    }
+
+    private static String lastReported = "";
+
+    private static void save() {
+        try { Files.createDirectories(Config.DIR); Files.writeString(FILE, Config.GSON.toJson(levels)); } catch (Exception ignored) {}
+    }
+
+    /** Forget all hand-set values (go back to reading the menus). */
+    public static void resetManual() {
+        levels().keySet().removeIf(k -> k.endsWith("#manual"));
+        save();
+    }
+
+    /** Manual correction from /shards set: your level and how many you already have toward it. */
+    public static String set(String shardName, int level, int have) {
+        Info hit = null;
+        for (Info i : ALL.values()) {
+            if (i.name().equalsIgnoreCase(shardName) || i.name().equalsIgnoreCase(shardName + " Shard")) { hit = i; break; }
+            if (hit == null && i.name().toLowerCase(Locale.ROOT).contains(shardName.toLowerCase(Locale.ROOT))) hit = i;
+        }
+        if (hit == null) return "§cNo shard called \"" + shardName + "\".";
+        levels().put(hit.id(), Math.max(0, Math.min(10, level)));
+        levels().put(hit.id() + "#used", 0);
+        levels().put(hit.id() + "#owned", Math.max(0, have));
+        levels().put(hit.id() + "#manual", 1);
+        save();
+        return "§a" + hit.name() + "§7: level §f" + level + "§7, have §f" + have + "§7 saved.";
+    }
+
     private static boolean put(String key, int value) {
+        if (levels().getOrDefault(key.replaceAll("#.*", "") + "#manual", 0) == 1 && !key.endsWith("#manual")) return false;   // your manual value wins
         if (Integer.valueOf(value).equals(levels().get(key))) return false;
         levels().put(key, value);
         return true;
@@ -191,9 +291,16 @@ public final class Shards {
             if (cur >= 10) continue;
             int to = toMax ? 10 : cur + 1;
             int need = 0;
-            for (int l = cur; l < to; l++) need += table[l];
-            // already syphoned into the current level + unused shards in the Hunting Box
-            int have = levels().getOrDefault(s.id() + "#used", 0) + levels().getOrDefault(s.id() + "#owned", 0);
+            int have;
+            Integer exact = levels().get(s.id() + (toMax ? "#toMax" : "#toNext"));
+            if (exact != null && levels().getOrDefault(s.id() + "#manual", 0) != 1) {
+                need = exact;                                                   // straight from the Attribute Menu
+                have = levels().getOrDefault(s.id() + "#owned", 0);             // + unused shards in the Hunting Box
+            } else {
+                for (int l = cur; l < to; l++) need += table[l];
+                // already syphoned into the current level + unused shards in the Hunting Box
+                have = levels().getOrDefault(s.id() + "#used", 0) + levels().getOrDefault(s.id() + "#owned", 0);
+            }
             int toBuy = Math.max(0, need - have);
             double each = buyPrice(s.id());
             out.add(new Pick(s, cur, to, need, have, toBuy, each <= 0 ? -1 : toBuy * each));
@@ -233,15 +340,19 @@ public final class Shards {
                     + (p.shard().attribute() != null ? "\n§f" + p.shard().attribute() : "")
                     + (!p.shard().effect().isEmpty() ? "\n§7" + p.shard().effect() : "")
                     + "\n§7Level " + p.from() + " → " + p.to() + ": " + p.shardsNeeded() + " shards"
-                    + (p.have() > 0 ? "\n§7You already have §f" + p.have() + " §8(syphoned into this level + in your Hunting Box)" : "")
+                    + (levels().containsKey(p.shard().id() + "#toNext") ? "\n§8Needed: Hypixel's own number from your Attribute Menu (progress included)" : "\n§8Needed: from the wiki table (open /am for exact numbers)")
+                    + (p.have() > 0 ? "\n§7Already in your Hunting Box / syphoned: §f" + p.have() : "")
                     + "\n§aTo buy: " + p.toBuy()
                     + "\n§8Needs Hunting " + hunting + " to syphon";
-            rows.add(new Row(new String[]{"§8" + i++ + ". " + color(p.shard().rarity()) + p.shard().name() + (unknown ? " §8(rarity ?)" : ""),
+            boolean manual = levels().getOrDefault(p.shard().id() + "#manual", 0) == 1;
+            rows.add(new Row(new String[]{"§8" + i++ + ". " + color(p.shard().rarity()) + p.shard().name() + (unknown ? " §8(rarity ?)" : "") + (manual ? " §b✎" : ""),
                     "§f" + (p.shard().attribute() != null ? p.shard().attribute() : ""), "§7Lv " + p.from() + "→" + p.to(),
                     p.have() > 0 ? "§f" + p.toBuy() + " §8(" + p.shardsNeeded() + "−" + p.have() + ")" : "§f" + p.toBuy(),
                     p.toBuy() == 0 ? "§aenough!" : p.cost() < 0 ? "§8not on Bazaar" : "§6" + Fmt.coins(p.cost()),
                     p.cost() < 0 ? "" : "§8" + Fmt.coins(p.cost() / (p.to() - p.from())) + "/lvl"}, tip,
-                    List.of(new Action("§eBazaar", "Opens " + p.shard().name() + " in the Bazaar and copies the amount to buy (" + p.toBuy()
+                    List.of(new Action("Edit", "Set your level and how many you already have (if the menu reading got it wrong).",
+                            () -> Commands.typeInChat("/shards set " + p.shard().name().replace(" Shard", "") + " " + p.from() + " " + p.have())),
+                            new Action("§eBazaar", "Opens " + p.shard().name() + " in the Bazaar and copies the amount to buy (" + p.toBuy()
                             + ") so you can paste it into the amount sign.", () -> {
                         Chat.copy(String.valueOf(p.toBuy()));
                         MenuScreen.runCommand("bz " + p.shard().name());

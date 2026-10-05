@@ -79,6 +79,8 @@ public final class Commands {
         add("Dungeons", "/dungeonprofit", "Dungeon profit: runs per hour, profit per run (menu).");
         add("Tools", "/talismans", "Cheapest Magical Power you don't have yet (menu); \"Other ways\" lists quest / drop ones.");
         add("Tools", "/shards", "Cheapest attribute levels to buy next, or to max (menu).");
+        add("Tools", "/shards reset", "Forget hand-set shard values and read the Attribute Menu again.");
+        add("Tools", "/shards set <shard> <level> <have>", "Fix a shard by hand, e.g. /shards set Grove 3 5 (level 3, already have 5).");
         add("Tools", "/itemsearch", "Everything in your Ender Chest and backpacks, searchable, with where it is (menu).");
         add("Tools", "/waypoints", "Waypoints from party chat and Crystal Hollows places; share or remove them (menu).");
         add("Tools", "Macro keys", "Six keys that run commands: set keys in Controls → SkyAssist, commands in Settings → Keybinds & macros.");
@@ -133,7 +135,9 @@ public final class Commands {
         return usage.substring(0, cut).trim() + " ";
     }
 
-    /** Opens chat with text already typed. */
+    /** Opens chat with text already typed (used by Edit buttons too). */
+    public static void typeInChat(String text) { openChat(text); }
+
     private static void openChat(String text) {
         Minecraft mc = Minecraft.getInstance();
         try {
