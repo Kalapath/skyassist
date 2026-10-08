@@ -16,6 +16,9 @@ public final class Election {
     private static final String URL = "https://api.hypixel.net/v2/resources/skyblock/election";
     private static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
     public static volatile String mayor;
+    /** The running election (Hypixel's "current" block): leading candidate and their vote share, if an election is on. */
+    public static volatile String leader;
+    public static volatile double leaderShare;
     public static volatile List<String> perks = new ArrayList<>();
     private static volatile long lastFetch;
 
@@ -36,6 +39,18 @@ public final class Election {
             if (m.has("perks")) for (var el : m.getAsJsonArray("perks")) p.add(el.getAsJsonObject().get("name").getAsString());
             perks = p;
             mayor = m.get("name").getAsString();
+            JsonObject root = JsonParser.parseString(body).getAsJsonObject();
+            leader = null;
+            if (root.has("current") && root.get("current").isJsonObject() && root.getAsJsonObject("current").has("candidates")) {
+                long total = 0, best = -1;
+                for (var el : root.getAsJsonObject("current").getAsJsonArray("candidates")) {
+                    JsonObject c = el.getAsJsonObject();
+                    long v = c.has("votes") ? c.get("votes").getAsLong() : 0;
+                    total += v;
+                    if (v > best) { best = v; leader = c.get("name").getAsString(); }
+                }
+                leaderShare = total > 0 ? 100.0 * best / total : 0;
+            }
         } catch (Exception ignored) {}
     }
 

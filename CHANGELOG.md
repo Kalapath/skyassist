@@ -1,5 +1,14 @@
 # Changelog
 
+## 8.7.2
+- Bazaar flips: min profit per flip (fixed or % of budget) and max items per flip.
+
+## 8.7.1
+- BIN source fallbacks + daily averages (fixes empty Craft → AH), skip reasons, min profit from budget, safe-only filter.
+
+## 8.7.0
+- /market: mayor, event and trend signals from price history with leave-one-out backtesting.
+
 ## 8.6.0
 - Craft flips counted in flip profit; instant buy / sell messages tracked.
 

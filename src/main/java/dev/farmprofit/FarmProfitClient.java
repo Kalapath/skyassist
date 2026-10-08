@@ -248,6 +248,7 @@ public final class FarmProfitClient implements ClientModInitializer {
                     .then(ClientCommands.literal("chat").executes(ctx -> { Accessories.show(Config.get().talismanCount); return 1; }))
                     .then(ClientCommands.argument("count", IntegerArgumentType.integer(1, 50))
                             .executes(ctx -> { TalismansScreen.requestOpen(IntegerArgumentType.getInteger(ctx, "count")); return 1; })));
+            dispatcher.register(ClientCommands.literal("market").executes(ctx -> { MenuScreen.open(() -> MarketSignals.screen(null)); return 1; }));
             dispatcher.register(ClientCommands.literal("itemsearch").executes(ctx -> { MenuScreen.open(() -> Storage.screen(null)); return 1; }));
             dispatcher.register(ClientCommands.literal("waypoints").executes(ctx -> { MenuScreen.open(() -> Waypoints.screen(null)); return 1; }));
             dispatcher.register(ClientCommands.literal("hotm").executes(ctx -> { MenuScreen.open(() -> TreeGuideScreen.hotm(null)); return 1; }));

@@ -43,6 +43,7 @@ public final class ProfitMenus {
         rows.add(entry("§fHOTM guide", "Best Heart of the Mountain trees for powder, gemstones, mithril, glacite.", () -> Compat.setScreen(mc(), TreeGuideScreen.hotm(ref.screen))));
         rows.add(entry("§fHOTF guide", "Best Heart of the Forest trees for Fig / Helix whispers.", () -> Compat.setScreen(mc(), TreeGuideScreen.hotf(ref.screen))));
         rows.add(entry("§fAttribute shards", "Cheapest attribute levels to buy next.", () -> Compat.setScreen(mc(), Shards.screen(ref.screen))));
+        rows.add(entry("§fMarket signals", "Mayor / event / trend signals from price history, with backtest.", () -> Compat.setScreen(mc(), MarketSignals.screen(ref.screen))));
         rows.add(entry("§fNext talismans", "Cheapest Magical Power you don't have yet.", () -> Compat.setScreen(mc(), TalismansScreen.screen(ref.screen))));
         rows.add(entry("§fSettings", "Every setting, with search.", () -> Compat.setScreen(mc(), new SettingsScreen(ref.screen))));
         rows.add(entry("§fCommands", "Every command with a short explanation.", () -> Compat.setScreen(mc(), Commands.screen(ref.screen))));
@@ -297,7 +298,17 @@ public final class ProfitMenus {
         footer.add("§7Budget §6" + Fmt.coins(c.bzBudget) + "  §7tax " + c.bzTax + "%  §7min volume " + Fmt.coins(c.bzMinVolume) + "/week");
         if (plan) footer.add("§7Plan uses §6" + Fmt.coins(cost) + "§7, expected profit §6" + Fmt.coins(profit) + "§7. Place the orders yourself; they're tracked from chat.");
         if (!Prices.loaded()) footer.add("§cPrices are still loading — press Refresh prices.");
-        return new Page(new String[]{"Item", "Buy → sell", "Margin", "Qty", "Profit"}, new int[]{150, 120, 50, 60, 70}, rows, flipTop(ref), footer);
+        if (Bazaar.minFlipProfit() > 0 || c.bzMaxItems > 0) footer.add("§8Hidden: flips making under " + Fmt.coins(Bazaar.minFlipProfit()) + " per order"
+                + (c.bzMaxItems > 0 ? ", items under " + Fmt.coins(c.bzBudget / c.bzMaxItems) + " each (max " + c.bzMaxItems + " items)" : "") + ".");
+        List<Action> top = new ArrayList<>(flipTop(ref));
+        top.add(new Action((c.bzMinFlipAuto ? "§a☑" : "§7☐") + " Min profit = " + c.bzMinFlipPercent + "% of budget",
+                "Each flip order must make at least " + c.bzMinFlipPercent + "% of your budget (" + Fmt.coins(c.bzBudget) + "), now "
+                        + Fmt.coins(c.bzBudget * c.bzMinFlipPercent / 100) + ". Change the % in Flip settings.",
+                () -> { c.bzMinFlipAuto = !c.bzMinFlipAuto; Config.save(); ref.screen.refresh(); }));
+        top.add(new Action((c.bzMaxItems > 0 ? "§a☑ Max " + c.bzMaxItems : "§7☐ Max 2000") + " items",
+                "Hide cheap items where your budget would buy more than this many. Change the number in Flip settings.",
+                () -> { c.bzMaxItems = c.bzMaxItems > 0 ? 0 : 2000; Config.save(); ref.screen.refresh(); }));
+        return new Page(new String[]{"Item", "Buy → sell", "Margin", "Qty", "Profit"}, new int[]{150, 120, 50, 60, 70}, rows, top, footer);
     }
 
     private static Page craftPage(boolean auction, Ref ref) {
@@ -317,11 +328,23 @@ public final class ProfitMenus {
                     auction ? "" : "§6" + Fmt.coins(f.perHour()) + "/h"}, tip, buttons));
         }
         List<String> footer = new ArrayList<>();
+        StringBuilder why = new StringBuilder("§8" + CraftFlips.checked + " recipes checked");
+        CraftFlips.SKIPPED.entrySet().stream().sorted((x, y) -> y.getValue() - x.getValue()).limit(5)
+                .forEach(x -> why.append(", ").append(x.getValue()).append(" ").append(x.getKey()));
+        footer.add(why.toString());
+        if (auction && Prices.binCount() < 100) footer.add("§cNo lowest-BIN prices loaded (source: " + Prices.binSource + "). AH flips need them; try /profit prices.");
         footer.add(auction ? "§7Ingredients bought now, result sold at lowest BIN (minus AH fees). Check recent sales before crafting a lot."
                 : "§7Ingredients bought instantly, result sold with a sell offer (after tax). Per hour uses your volume share and budget.");
         footer.add("§8Hover a row for the ingredients. Settings → Bazaar flipping: min profit, min margin, budget.");
+        Config cc = Config.get();
+        List<Action> top = new ArrayList<>(flipTop(ref));
+        top.add(new Action((cc.craftFlipAutoMinProfit ? "§a☑" : "§7☐") + " Min profit = " + cc.craftFlipAutoPercent + "% of budget",
+                "Min profit per craft from your flip budget (" + Fmt.coins(cc.bzBudget) + "): now " + Fmt.coins(CraftFlips.minProfit()) + ".",
+                () -> { cc.craftFlipAutoMinProfit = !cc.craftFlipAutoMinProfit; Config.save(); ref.screen.refresh(); }));
+        top.add(new Action((cc.craftFlipSafeOnly ? "§a☑" : "§7☐") + " Safe only", "Hide volatile, competitive and possibly inflated flips.",
+                () -> { cc.craftFlipSafeOnly = !cc.craftFlipSafeOnly; Config.save(); ref.screen.refresh(); }));
         return new Page(new String[]{"Craft", "Cost", "Sells for", "Profit", "Margin", auction ? "" : "Per hour"},
-                new int[]{140, 60, 60, 60, 45, 60}, rows, flipTop(ref), footer);
+                new int[]{140, 60, 60, 60, 45, 60}, rows, top, footer);
     }
 
     private static Page ordersPage(Ref ref) {

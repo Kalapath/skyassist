@@ -51,6 +51,28 @@ Open chat (**T**). While chat is open:
 Detected automatically from your purse on the sidebar when a quest starts (handles Aatrox discounts etc.).
 If you'd rather use a fixed number, set `slayerQuestCost` in the config (anything above 0 overrides auto-detection).
 
+## New in 8.7.2
+- Bazaar flips: **min profit per flip** (fixed, or ☐ a % of your budget) and **max items per flip** (hides cheap items
+  you'd need thousands of to use your budget). Quick tick boxes on the Best flips tab.
+
+## New in 8.7.1
+- **Craft → AH fixed**: lowest-BIN prices now come from several sources in turn (lb.tricked.dev — used by Skytils —,
+  your configured one, moulberry.codes). AH flips were empty because moulberry.codes alone returned nothing.
+  `/profit debug` shows how many BIN prices loaded and from where.
+- Craft flip tabs say why recipes were left out ("810 not sold on the AH, 95 ingredient without price...").
+- ☐ **Min profit = % of budget**: minimum profit per craft from your flip budget (default 1%).
+- ☐ **Safe only**: hides volatile (25%+ buy/sell gap), competitive (under 3% margin) and possibly inflated
+  (BIN 30%+ over its daily average, or 100%+ margin) flips.
+
+## New in 8.7 — market signals
+`/market` (also in the main menu): statistics from Coflnet's public price + mayor history, not guesses.
+- **Mayor**: what the election leader's (and current mayor's) past terms did to each item (first 3 days vs. the week before).
+- **Events**: the same around past Spooky Festivals, Seasons of Jerry and New Years.
+- **Trends**: prices unusually low / high vs. the last 7 days (z-score), with 24 h and 7 d change.
+- **Backtest**: each signal is checked against every past case (leave-one-out); only signals that were right often enough
+  are shown, with their hit rate (e.g. 4/5). Thresholds in Settings → Bazaar flipping.
+- Data is cached for a day in `config/skyassist/market`; the first load takes a minute or two in the background.
+
 ## New in 8.6
 - **Craft flips count in flip profit**: selling an item you crafted from Bazaar-bought ingredients logs a craft flip
   (cost = what you paid for the ingredients, 2 levels deep, the rest at today's price). Instant buys and instant sells

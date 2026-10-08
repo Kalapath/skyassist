@@ -63,6 +63,7 @@ public final class Commands {
         add("Bazaar", "/flips plan", "Splits your budget over the best safe flips (menu).");
         add("Bazaar", "/flips orders", "Your tracked orders and whether you're outbid / undercut (menu).");
         add("Bazaar", "/flips log", "Profit from your finished flips (menu).");
+        add("Bazaar", "/market", "Market signals: what past mayor terms / events / trends did to prices, backtested (menu).");
         add("Bazaar", "/flips craft", "Buy ingredients, craft, sell on the Bazaar for more (menu).");
         add("Bazaar", "/flips craftah", "Buy ingredients, craft, sell on the Auction House (armor, weapons...) (menu).");
         add("Bazaar", "/flips remove <number>", "Removes a stale order from the list.");

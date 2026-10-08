@@ -488,6 +488,30 @@ public final class Config {
     public boolean bzSound = true;
     @Setting(category = "Bazaar flipping", label = "Craft flips: min profit", desc = "Craft flips (Craft → Bazaar / AH tabs) must make at least this much per craft.", min = 0, max = 1e12)
     public double craftFlipMinProfit = 1000;
+    @Setting(category = "Bazaar flipping", label = "Flips: min profit per flip", desc = "Hide Bazaar flips whose full order (the amount you'd buy) makes less than this. 0 = off.", min = 0, max = 1e12)
+    public double bzMinFlipProfit = 0;
+    @Setting(category = "Bazaar flipping", label = "Flips: min profit from budget", desc = "Instead of the fixed number above, a flip order must make at least a % of your flip budget (e.g. 1% of 50m = 500k).")
+    public boolean bzMinFlipAuto = false;
+    @Setting(category = "Bazaar flipping", label = "Flips: % of budget", desc = "With 'min profit from budget' on: profit per flip order must be at least this % of your budget.", min = 0.01, max = 50)
+    public double bzMinFlipPercent = 1;
+    @Setting(category = "Bazaar flipping", label = "Flips: max items per flip", desc = "Hide cheap items where spending your budget means buying more than this many (e.g. 2000 with 50m = items under 25k hidden). 0 = off.", min = 0, max = 1000000)
+    public int bzMaxItems = 0;
+    @Setting(category = "Bazaar flipping", label = "Craft flips: min profit from budget", desc = "Instead of the fixed min profit above, require a % of your flip budget per craft (e.g. 1% of 10m = 100k).")
+    public boolean craftFlipAutoMinProfit = false;
+    @Setting(category = "Bazaar flipping", label = "Craft flips: % of budget", desc = "With 'min profit from budget' on: profit per craft must be at least this % of your flip budget.", min = 0.01, max = 50)
+    public double craftFlipAutoPercent = 1;
+    @Setting(category = "Bazaar flipping", label = "Craft flips: safe only", desc = "Hide volatile (big buy/sell gap), competitive (under 3% margin) and possibly inflated (BIN well above its daily average, or 100%+ margin) flips.")
+    public boolean craftFlipSafeOnly = false;
+    @Setting(category = "Bazaar flipping", label = "Market: items analysed", desc = "How many of the most traded Bazaar items /market downloads history for (more = slower first load).", min = 10, max = 300)
+    public int marketItems = 60;
+    @Setting(category = "Bazaar flipping", label = "Market: history (days)", desc = "How far back /market looks for mayor terms and events.", min = 30, max = 730)
+    public int marketHistoryDays = 365;
+    @Setting(category = "Bazaar flipping", label = "Market: min past cases", desc = "A mayor / event signal needs at least this many past cases.", min = 2, max = 20)
+    public int marketMinSamples = 3;
+    @Setting(category = "Bazaar flipping", label = "Market: min move %", desc = "Only show signals that expect at least this % change.", min = 1, max = 100)
+    public double marketMinMove = 5;
+    @Setting(category = "Bazaar flipping", label = "Market: min hit rate %", desc = "Only show signals the backtest called right at least this often.", min = 50, max = 100)
+    public double marketMinHitRate = 60;
     /** Coins subtracted from profit every time a slayer quest starts (set to what your tier costs). */
     @Setting(category = "Combat & Slayers", label = "Slayer quest cost", desc = "Coins subtracted per slayer quest. 0 = detect automatically from your purse.", min = 0, max = 1000000000.0)
     public double slayerQuestCost = 0;
@@ -497,7 +521,7 @@ public final class Config {
             "Dwarven Mines", "Crystal Hollows", "Mineshaft", "Glacite", "Deep Caverns", "Gold Mine"));
     /** Lowest-BIN prices for auction-house items (rare drops). Set to "" to disable. */
     @Setting(category = "General", label = "Lowest BIN price URL", desc = "Where auction-house prices come from. Leave empty to turn auction prices off.")
-    public String lowestBinUrl = "https://moulberry.codes/lowestbin.json";
+    public String lowestBinUrl = "https://lb.tricked.dev/lowestbins";
     /** "Item Name": "BAZAAR_ID" */
     @Setting(category = "Items & areas", label = "Extra item prices", desc = "name=BAZAAR_ID, separated by commas. For items the mod can't price.")
     public Map<String, String> extraItems = new HashMap<>();

@@ -47,9 +47,57 @@ public final class Prices {
         lastBazaarFetch = lastFetch;
         fetch(BAZAAR_URL, Prices::parseBazaar);
         if (!itemsLoaded) fetch(ITEMS_URL, Prices::parseItems);
-        String bin = Config.get().lowestBinUrl;
-        if (bin != null && !bin.isBlank()) fetch(bin, Prices::parseBins);
+        loadBins(0);
+        fetch("https://lb.tricked.dev/averages/1day.json", Prices::parseAverages);
     }
+
+    /** Lowest-BIN sources, tried in order until one answers (moulberry.codes alone left AH prices empty when it was down). */
+    private static java.util.List<String> binSources() {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        out.add("https://lb.tricked.dev/lowestbins");                 // used by Skytils
+        String own = Config.get().lowestBinUrl;
+        if (own != null && !own.isBlank() && !out.contains(own)) out.add(own);
+        if (!out.contains("https://moulberry.codes/lowestbin.json")) out.add("https://moulberry.codes/lowestbin.json");
+        return out;
+    }
+
+    public static volatile String binSource = "none yet";
+
+    private static void loadBins(int i) {
+        java.util.List<String> src = binSources();
+        if (i >= src.size()) { binSource = "all sources failed"; return; }
+        String url = src.get(i);
+        HTTP.sendAsync(HttpRequest.newBuilder(URI.create(url)).header("User-Agent", "SkyAssist").timeout(Duration.ofSeconds(30)).GET().build(),
+                        HttpResponse.BodyHandlers.ofString())
+                .thenAccept(res -> {
+                    int before = BINS.size();
+                    if (res.statusCode() == 200) { try { parseBins(res.body()); } catch (Exception ignored) {} }
+                    if (res.statusCode() == 200 && BINS.size() > 100) binSource = url;
+                    else if (BINS.size() <= Math.max(100, before)) loadBins(i + 1);                  // try the next one
+                })
+                .exceptionally(err -> { loadBins(i + 1); return null; });
+    }
+
+    /** Average lowest BIN over the last day (for spotting inflated prices). */
+    private static final Map<String, Double> BIN_AVG = new ConcurrentHashMap<>();
+
+    private static void parseAverages(String body) {
+        try {
+            JsonObject root = JsonParser.parseString(body).getAsJsonObject();
+            for (var e : root.entrySet()) {
+                try {
+                    var v = e.getValue();
+                    double d = v.isJsonPrimitive() ? v.getAsDouble()
+                            : v.getAsJsonObject().has("price") ? v.getAsJsonObject().get("price").getAsDouble()
+                            : v.getAsJsonObject().has("clean_price") ? v.getAsJsonObject().get("clean_price").getAsDouble() : 0;
+                    if (d > 0) BIN_AVG.put(e.getKey(), d);
+                } catch (Exception ignored) {}
+            }
+        } catch (Exception ignored) {}
+    }
+
+    /** Average lowest BIN over a day, or 0 if unknown. */
+    public static double binAverage(String id) { return BIN_AVG.getOrDefault(id, 0.0); }
 
     private static void fetch(String url, java.util.function.Consumer<String> parser) {
         HttpRequest req = HttpRequest.newBuilder(URI.create(url))
