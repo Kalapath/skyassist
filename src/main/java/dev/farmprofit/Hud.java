@@ -118,6 +118,7 @@ public final class Hud {
             case "bazaar" -> { return Bazaar.hudLines(); }
             case "greenhouse" -> Greenhouse.addHudLines(out);
             case "waypoints" -> Waypoints.addHudLines(out);
+            case "timers" -> Timers.addHudLines(out);
             case "secrets" -> {
                 if (cfg.separatePanels && Tracker.DUNGEONS.equals(Tracker.area)) Secrets.addHudLines(out);
             }

@@ -54,6 +54,7 @@ public final class Commands {
         add("HUD", "/profit icons", "Item icons on the HUD on or off.");
         add("HUD", "/profit scale <0.5-3>", "Size of the main HUD panel.");
         add("HUD", "/profit move <x> <y>", "Moves the main HUD panel to an exact spot.");
+        add("HUD", "Timers panel", "Dark Auction, Mining event, Cult, festivals, Jacob, and bosses (Broodmother, Endstone Protector, Dragon...): each on/off in Settings → Timers.");
         add("HUD", "/profit secrets", "Dungeon secret finder on or off.");
         add("HUD", "Crystal Hollows treasure chests", "Automatic: box + countdown on uncovered chests, chests/min, Double Powder, loot (Mining settings).");
 

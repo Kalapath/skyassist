@@ -309,6 +309,42 @@ public final class Config {
     public int swingDuration = 12;
     @Setting(category = "Extras", label = "Rainbow maxed enchants", desc = "Maxed enchantments in tooltips are rainbow-colored (sets the Perfect enchant color).")
     public boolean rainbowMaxed = false;
+    @Setting(category = "Timers", label = "Timers panel", desc = "A separate HUD panel with event timers (move it with /profit gui).")
+    public boolean timersPanel = true;
+    @Setting(category = "Timers", label = "Dark Auction", desc = "Every hour at :55.")
+    public boolean timerDarkAuction = true;
+    @Setting(category = "Timers", label = "Dwarven Mines event", desc = "The current Mining event (2x Powder, Goblin Raid, Gone with the Wind...) from your tab list / sidebar.")
+    public boolean timerMiningEvent = true;
+    @Setting(category = "Timers", label = "Cult of the Fallen Star", desc = "Days 7, 14, 21 and 28 of every SkyBlock month, 00:00-06:00.")
+    public boolean timerCult = true;
+    @Setting(category = "Timers", label = "Spooky Festival", desc = "Autumn 29-31.")
+    public boolean timerSpooky = true;
+    @Setting(category = "Timers", label = "Traveling Zoo", desc = "Early Summer 1-3 and Early Winter 1-3.")
+    public boolean timerZoo = false;
+    @Setting(category = "Timers", label = "Season of Jerry", desc = "Late Winter 24-26.")
+    public boolean timerJerry = false;
+    @Setting(category = "Timers", label = "New Year", desc = "Late Winter 29-31.")
+    public boolean timerNewYear = false;
+    @Setting(category = "Timers", label = "Hoppity's Hunt", desc = "All of Spring.")
+    public boolean timerHoppity = false;
+    @Setting(category = "Timers", label = "Jacob's contest", desc = "Next contest and its crops.")
+    public boolean timerJacob = true;
+    @Setting(category = "Timers", label = "Boss: Broodmother", desc = "Spider's Den: Dormant / Soon / Imminent / Alive (from the tab list), remembered when you leave.")
+    public boolean bossBroodmother = true;
+    @Setting(category = "Timers", label = "Boss: Endstone Protector", desc = "The End: the Protector's stage (from the tab list).")
+    public boolean bossProtector = true;
+    @Setting(category = "Timers", label = "Boss: Ender Dragon", desc = "Dragon's Nest: dragon / eyes status (from the tab list).")
+    public boolean bossDragon = false;
+    @Setting(category = "Timers", label = "Boss: Arachne", desc = "Spider's Den: Arachne status, if Hypixel shows it in the tab list.")
+    public boolean bossArachne = false;
+    @Setting(category = "Timers", label = "Boss: Kuudra", desc = "Kuudra status, if shown in the tab list.")
+    public boolean bossKuudra = false;
+    @Setting(category = "Timers", label = "Boss: Vanquisher", desc = "Crimson Isle: Vanquisher status, if shown in the tab list.")
+    public boolean bossVanquisher = false;
+    @Setting(category = "Timers", label = "Boss: Golden Goblin", desc = "Dwarven Mines / Crystal Hollows: Golden Goblin status, if shown in the tab list.")
+    public boolean bossGoldenGoblin = false;
+    @Setting(category = "Timers", label = "Extra tab lines to watch", desc = "Comma separated starts of tab-list lines to show and remember, e.g. \"Matriarch\" or \"Bal\". Shows the rest of that line.")
+    public java.util.List<String> timerExtraTabLines = new java.util.ArrayList<>();
     @Setting(category = "Keybinds & macros", label = "Macro 1 command", desc = "What Macro 1 runs. Set its key in Options → Controls → Key Binds → SkyAssist. Commands start with /, anything else is sent as chat.")
     public String macro1 = "/warp garden";
     @Setting(category = "Keybinds & macros", label = "Macro 2 command", desc = "What Macro 2 runs. Set its key in Options → Controls → Key Binds → SkyAssist. Commands start with /, anything else is sent as chat.")
@@ -514,6 +550,7 @@ public final class Config {
                 "Wood Chest", "Gold Chest", "Diamond Chest", "Emerald Chest", "Obsidian Chest", "Bedrock Chest"));
         if ("FF3030".equals(instance.pestBoxColorHex) && !instance.pestColorMigrated) { instance.pestBoxColorHex = "00FF00"; instance.pestTrail = false; }
         instance.pestColorMigrated = true;
+        if (instance.timerExtraTabLines == null) instance.timerExtraTabLines = new java.util.ArrayList<>();
         if (instance.chatHideContaining == null) instance.chatHideContaining = new java.util.ArrayList<>();
         if (instance.mutedSounds == null) instance.mutedSounds = new java.util.ArrayList<>();
         if (instance.ignoredItems == null) instance.ignoredItems = new java.util.ArrayList<>();

@@ -559,6 +559,7 @@ public final class Tracker {
         }
 
         tabLines = lines;
+        Timers.tick();
         String a = tab.get("Area");
         areaName = a != null ? a : HypixelLocation.map;
         area = null;

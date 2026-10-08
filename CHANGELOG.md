@@ -1,5 +1,11 @@
 # Changelog
 
+## 8.5.1
+- Boss timers (tab-list based, remembered) with toggles + custom tab lines.
+
+## 8.5.0
+- Timers panel with per-timer toggles.
+
 ## 8.4.3
 - Greenhouse: added Devourer, Glasscorn, Phantomleaf, Timestalk, Godseed, Jerryflower.
 

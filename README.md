@@ -51,6 +51,16 @@ Open chat (**T**). While chat is open:
 Detected automatically from your purse on the sidebar when a quest starts (handles Aatrox discounts etc.).
 If you'd rather use a fixed number, set `slayerQuestCost` in the config (anything above 0 overrides auto-detection).
 
+## New in 8.5.1
+- Boss timers in the Timers panel, each with a switch: Broodmother, Endstone Protector, Ender Dragon, Arachne, Kuudra,
+  Vanquisher, Golden Goblin. Their state is read from Hypixel's tab list on their island and remembered with
+  "x min ago" when you leave. "Extra tab lines to watch" adds any other tab-list line you want.
+
+## New in 8.5
+- **Timers panel** (its own HUD panel, move it with `/profit gui`), each timer switchable in Settings → Timers:
+  Dark Auction (:55 every hour), current Dwarven Mines event (from your tab list / sidebar), Cult of the Fallen Star,
+  Spooky Festival, Traveling Zoo, Season of Jerry, New Year, Hoppity's Hunt, Jacob's contest, plus today's SkyBlock date.
+
 ## New in 8.4.3
 - Greenhouse: all 40 mutations — added the missing Legendaries Devourer, Glasscorn, Phantomleaf, Timestalk, Godseed
   (special: every positive effect) and Jerryflower (from a Fertilized Jerryseed).

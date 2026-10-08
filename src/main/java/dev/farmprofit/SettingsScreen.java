@@ -25,7 +25,7 @@ import java.util.Map;
 public final class SettingsScreen extends Screen {
     private static final String OTHER = "Other", HIDDEN = "Hidden items", RESULTS = "Search";
     private static final List<String> ORDER = List.of("General", "HUD", "Farming", "Mining", "Foraging", "Fishing",
-            "Combat & Slayers", "Dungeons", "Kuudra", "Diana", "Bazaar flipping", "Items & areas", "Chat & sounds", "Keybinds & macros", "Extras");
+            "Combat & Slayers", "Dungeons", "Kuudra", "Diana", "Bazaar flipping", "Items & areas", "Chat & sounds", "Keybinds & macros", "Timers", "Extras");
     private static String category;
     private static String query = "";
     private final Screen parent;
