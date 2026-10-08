@@ -494,8 +494,12 @@ public final class Config {
     public boolean bzMinFlipAuto = false;
     @Setting(category = "Bazaar flipping", label = "Flips: % of budget", desc = "With 'min profit from budget' on: profit per flip order must be at least this % of your budget.", min = 0.01, max = 50)
     public double bzMinFlipPercent = 1;
-    @Setting(category = "Bazaar flipping", label = "Flips: max items per flip", desc = "Hide cheap items where spending your budget means buying more than this many (e.g. 2000 with 50m = items under 25k hidden). 0 = off.", min = 0, max = 1000000)
-    public int bzMaxItems = 0;
+    @Setting(category = "Bazaar flipping", label = "Flips: min item price", desc = "Hide flips on items cheaper than this (so you never have to buy huge amounts). 0 = off.", min = 0, max = 1e12)
+    public double bzMinItemPrice = 0;
+    @Setting(category = "Bazaar flipping", label = "Flips: min item price from budget", desc = "Instead of the fixed price above, items must cost at least a % of your flip budget (0.1% of 50m = 50k each, so at most ~1,000 items).")
+    public boolean bzMinItemPriceAuto = false;
+    @Setting(category = "Bazaar flipping", label = "Flips: item price % of budget", desc = "With 'min item price from budget' on: each item must cost at least this % of your budget.", min = 0.001, max = 50)
+    public double bzMinItemPricePercent = 0.1;
     @Setting(category = "Bazaar flipping", label = "Craft flips: min profit from budget", desc = "Instead of the fixed min profit above, require a % of your flip budget per craft (e.g. 1% of 10m = 100k).")
     public boolean craftFlipAutoMinProfit = false;
     @Setting(category = "Bazaar flipping", label = "Craft flips: % of budget", desc = "With 'min profit from budget' on: profit per craft must be at least this % of your flip budget.", min = 0.01, max = 50)

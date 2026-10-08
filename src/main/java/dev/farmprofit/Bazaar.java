@@ -367,6 +367,12 @@ public final class Bazaar {
         return c.bzMinFlipAuto ? c.bzBudget * c.bzMinFlipPercent / 100.0 : c.bzMinFlipProfit;
     }
 
+    /** Minimum buy price per item: fixed, or a % of your flip budget (0.1% of 50m = 50k). 0 = off. */
+    public static double minItemPrice() {
+        Config c = Config.get();
+        return c.bzMinItemPriceAuto ? c.bzBudget * c.bzMinItemPricePercent / 100.0 : c.bzMinItemPrice;
+    }
+
     public static List<Flip> computeFlips() {
         Config c = Config.get();
         double tax = tax(), share = c.bzShare / 100.0;
@@ -391,7 +397,8 @@ public final class Bazaar {
             // with a big budget: skip flips that earn too little per order, and cheap items you'd need thousands of
             double minFlip = minFlipProfit();
             if (minFlip > 0 && f.qty * f.profitEach < minFlip) continue;
-            if (c.bzMaxItems > 0 && c.bzBudget / f.buyAt > c.bzMaxItems) continue;
+            double minPrice = minItemPrice();                       // cheap items you'd have to buy thousands of
+            if (minPrice > 0 && f.buyAt < minPrice) continue;
             if (f.margin > 50) f.warnings.add("huge margin, maybe manipulated");
             if (b[4] + b[5] > 600) f.warnings.add("very competitive");
             if (f.hourlyVolume < 100) f.warnings.add("slow to fill");

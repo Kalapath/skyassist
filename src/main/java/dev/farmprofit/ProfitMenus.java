@@ -298,16 +298,14 @@ public final class ProfitMenus {
         footer.add("§7Budget §6" + Fmt.coins(c.bzBudget) + "  §7tax " + c.bzTax + "%  §7min volume " + Fmt.coins(c.bzMinVolume) + "/week");
         if (plan) footer.add("§7Plan uses §6" + Fmt.coins(cost) + "§7, expected profit §6" + Fmt.coins(profit) + "§7. Place the orders yourself; they're tracked from chat.");
         if (!Prices.loaded()) footer.add("§cPrices are still loading — press Refresh prices.");
-        if (Bazaar.minFlipProfit() > 0 || c.bzMaxItems > 0) footer.add("§8Hidden: flips making under " + Fmt.coins(Bazaar.minFlipProfit()) + " per order"
-                + (c.bzMaxItems > 0 ? ", items under " + Fmt.coins(c.bzBudget / c.bzMaxItems) + " each (max " + c.bzMaxItems + " items)" : "") + ".");
+        if (Bazaar.minItemPrice() > 0) footer.add("§8Hidden: items cheaper than " + Fmt.coins(Bazaar.minItemPrice()) + " each (your budget buys at most ~"
+                + Fmt.num(Math.round(c.bzBudget / Bazaar.minItemPrice())) + " of any item).");
+        if (Bazaar.minFlipProfit() > 0) footer.add("§8Hidden: flips making under " + Fmt.coins(Bazaar.minFlipProfit()) + " per order.");
         List<Action> top = new ArrayList<>(flipTop(ref));
-        top.add(new Action((c.bzMinFlipAuto ? "§a☑" : "§7☐") + " Min profit = " + c.bzMinFlipPercent + "% of budget",
-                "Each flip order must make at least " + c.bzMinFlipPercent + "% of your budget (" + Fmt.coins(c.bzBudget) + "), now "
-                        + Fmt.coins(c.bzBudget * c.bzMinFlipPercent / 100) + ". Change the % in Flip settings.",
-                () -> { c.bzMinFlipAuto = !c.bzMinFlipAuto; Config.save(); ref.screen.refresh(); }));
-        top.add(new Action((c.bzMaxItems > 0 ? "§a☑ Max " + c.bzMaxItems : "§7☐ Max 2000") + " items",
-                "Hide cheap items where your budget would buy more than this many. Change the number in Flip settings.",
-                () -> { c.bzMaxItems = c.bzMaxItems > 0 ? 0 : 2000; Config.save(); ref.screen.refresh(); }));
+        top.add(new Action((c.bzMinItemPriceAuto ? "§a☑" : "§7☐") + " Min item price = " + c.bzMinItemPricePercent + "% of budget",
+                "Only items costing at least " + c.bzMinItemPricePercent + "% of your budget (" + Fmt.coins(c.bzBudget) + "): now "
+                        + Fmt.coins(c.bzBudget * c.bzMinItemPricePercent / 100) + " each. Change the % in Flip settings.",
+                () -> { c.bzMinItemPriceAuto = !c.bzMinItemPriceAuto; Config.save(); ref.screen.refresh(); }));
         return new Page(new String[]{"Item", "Buy → sell", "Margin", "Qty", "Profit"}, new int[]{150, 120, 50, 60, 70}, rows, top, footer);
     }
 

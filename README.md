@@ -51,6 +51,10 @@ Open chat (**T**). While chat is open:
 Detected automatically from your purse on the sidebar when a quest starts (handles Aatrox discounts etc.).
 If you'd rather use a fixed number, set `slayerQuestCost` in the config (anything above 0 overrides auto-detection).
 
+## New in 8.7.3
+- Bazaar flips: **min item price** (fixed, or ☐ a % of your budget — 0.1% of 50m = 50k each) so cheap items you'd need
+  thousands of don't show. Replaces "max items per flip".
+
 ## New in 8.7.2
 - Bazaar flips: **min profit per flip** (fixed, or ☐ a % of your budget) and **max items per flip** (hides cheap items
   you'd need thousands of to use your budget). Quick tick boxes on the Best flips tab.

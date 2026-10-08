@@ -1,5 +1,8 @@
 # Changelog
 
+## 8.7.3
+- Bazaar flips: min item price (fixed or % of budget) instead of max items.
+
 ## 8.7.2
 - Bazaar flips: min profit per flip (fixed or % of budget) and max items per flip.
 
