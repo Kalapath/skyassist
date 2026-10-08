@@ -269,12 +269,39 @@ public final class ProfitMenus {
     }
 
     private static List<Action> flipTop(Ref ref) {
-        return List.of(
+        List<Action> out = new ArrayList<>(List.of(
                 new Action("Refresh prices", "Gets the newest Bazaar prices.", () -> { Prices.refresh(); ref.screen.refresh(); }),
                 new Action("Flip settings", "Budget, minimum volume, tax and more.", () -> {
-                    SettingsScreen.selectTab("Bazaar flipping");
+                    SettingsScreen.selectSection("Bazaar", "Flip finder");
                     Compat.setScreen(mc(), new SettingsScreen(ref.screen));
-                }));
+                })));
+        out.add(new Action("§6★ Best settings", "Tries ~500 filter combinations on today's Bazaar prices and keeps the one with the most profit for the least work "
+                + "(fewer orders, less fought-over items, faster fills). Safe only goes on. Uses your budget: " + Fmt.coins(Config.get().bzBudget) + ".",
+                () -> { FlipTuner.tuneAndReport(); ref.screen.refresh(); }));
+        if (FlipTuner.canUndo()) out.add(new Action("§7↺ Undo", "Puts your flip settings back to how they were before Best settings.",
+                () -> { FlipTuner.undo(); Tracker.say("§6[Flips] §7Settings restored."); ref.screen.refresh(); }));
+        return out;
+    }
+
+    /** One switch for normal and craft flips. */
+    private static Action safeToggle(Ref ref) {
+        Config c = Config.get();
+        return new Action((c.craftFlipSafeOnly ? "§a☑" : "§7☐") + " Safe only",
+                "Hide volatile, competitive, slow and possibly manipulated / inflated flips. Applies to every flip tab.",
+                () -> { c.craftFlipSafeOnly = !c.craftFlipSafeOnly; Config.save(); ref.screen.refresh(); });
+    }
+
+    /** Button showing a flip rule ("1%" or "50k") and its coin value; click cycles through presets. */
+    private static Action ruleButton(String name, String current, String[] presets, String tip,
+                                     java.util.function.Consumer<String> set, Ref ref) {
+        double coins = Config.rule(current);
+        String shown = coins <= 0 ? "§7off" : current.trim().endsWith("%") ? "§f" + current.trim() + " §8(" + Fmt.coins(coins) + ")" : "§f" + Fmt.coins(coins);
+        return new Action("§7" + name + ": " + shown, tip + "\n§8Budget: " + Fmt.coins(Config.get().bzBudget), () -> {
+            int i = java.util.Arrays.asList(presets).indexOf(current.trim());
+            set.accept(presets[(i + 1) % presets.length]);
+            Config.save();
+            ref.screen.refresh();
+        });
     }
 
     private static Page flipsPage(List<Bazaar.Flip> flips, Ref ref, boolean plan) {
@@ -301,11 +328,15 @@ public final class ProfitMenus {
         if (Bazaar.minItemPrice() > 0) footer.add("§8Hidden: items cheaper than " + Fmt.coins(Bazaar.minItemPrice()) + " each (your budget buys at most ~"
                 + Fmt.num(Math.round(c.bzBudget / Bazaar.minItemPrice())) + " of any item).");
         if (Bazaar.minFlipProfit() > 0) footer.add("§8Hidden: flips making under " + Fmt.coins(Bazaar.minFlipProfit()) + " per order.");
+        if (c.craftFlipSafeOnly && Bazaar.safeHidden > 0) footer.add("§8Safe only hid " + Bazaar.safeHidden + " risky flips (⚠, under 3% margin or 25%+ buy/sell gap).");
         List<Action> top = new ArrayList<>(flipTop(ref));
-        top.add(new Action((c.bzMinItemPriceAuto ? "§a☑" : "§7☐") + " Min item price = " + c.bzMinItemPricePercent + "% of budget",
-                "Only items costing at least " + c.bzMinItemPricePercent + "% of your budget (" + Fmt.coins(c.bzBudget) + "): now "
-                        + Fmt.coins(c.bzBudget * c.bzMinItemPricePercent / 100) + " each. Change the % in Flip settings.",
-                () -> { c.bzMinItemPriceAuto = !c.bzMinItemPriceAuto; Config.save(); ref.screen.refresh(); }));
+        top.add(safeToggle(ref));
+        top.add(ruleButton("Min item price", c.flipMinItemPrice, new String[]{"0", "0.05%", "0.1%", "0.5%", "1%"},
+                "Hide items cheaper than this, so you never buy thousands of something. Click to cycle: off, 0.05%, 0.1%, 0.5%, 1% of your budget. Exact value in Settings → Bazaar.",
+                v -> c.flipMinItemPrice = v, ref));
+        top.add(ruleButton("Min profit/flip", c.flipMinProfit, new String[]{"0", "0.5%", "1%", "2%", "5%"},
+                "Hide flips whose whole order makes less than this. Click to cycle: off, 0.5%, 1%, 2%, 5% of your budget.",
+                v -> c.flipMinProfit = v, ref));
         return new Page(new String[]{"Item", "Buy → sell", "Margin", "Qty", "Profit"}, new int[]{150, 120, 50, 60, 70}, rows, top, footer);
     }
 
@@ -333,14 +364,21 @@ public final class ProfitMenus {
         if (auction && Prices.binCount() < 100) footer.add("§cNo lowest-BIN prices loaded (source: " + Prices.binSource + "). AH flips need them; try /profit prices.");
         footer.add(auction ? "§7Ingredients bought now, result sold at lowest BIN (minus AH fees). Check recent sales before crafting a lot."
                 : "§7Ingredients bought instantly, result sold with a sell offer (after tax). Per hour uses your volume share and budget.");
-        footer.add("§8Hover a row for the ingredients. Settings → Bazaar flipping: min profit, min margin, budget.");
         Config cc = Config.get();
+        int cols = Unlocks.known("collection"), slayers = Unlocks.known("slayer"), skills = Unlocks.known("skill");
+        if (cc.craftOnlyUnlocked) footer.add((cols == 0 ? "§e" : "§8") + "Your unlocks: " + cols + " collections, " + slayers + " slayers, " + skills
+                + " skills read. Open each /collection category, the slayer menu and /skills to update."
+                + (CraftFlips.locked > 0 ? " Hidden as locked: " + CraftFlips.locked + "." : "")
+                + (CraftFlips.unknown > 0 ? (cc.craftHideUnknown ? " Hidden as unknown: " : " Unknown (shown with a note): ") + CraftFlips.unknown + "." : ""));
+        footer.add("§8Hover a row for the ingredients. Settings → Bazaar: min profit, min margin, budget.");
         List<Action> top = new ArrayList<>(flipTop(ref));
-        top.add(new Action((cc.craftFlipAutoMinProfit ? "§a☑" : "§7☐") + " Min profit = " + cc.craftFlipAutoPercent + "% of budget",
-                "Min profit per craft from your flip budget (" + Fmt.coins(cc.bzBudget) + "): now " + Fmt.coins(CraftFlips.minProfit()) + ".",
-                () -> { cc.craftFlipAutoMinProfit = !cc.craftFlipAutoMinProfit; Config.save(); ref.screen.refresh(); }));
-        top.add(new Action((cc.craftFlipSafeOnly ? "§a☑" : "§7☐") + " Safe only", "Hide volatile, competitive and possibly inflated flips.",
-                () -> { cc.craftFlipSafeOnly = !cc.craftFlipSafeOnly; Config.save(); ref.screen.refresh(); }));
+        top.add(safeToggle(ref));
+        top.add(new Action((cc.craftOnlyUnlocked ? "§a☑" : "§7☐") + " Only what I can craft",
+                "Hide recipes you haven't unlocked (collection / slayer / skill level). Levels come from the menus you open and level-up messages.",
+                () -> { cc.craftOnlyUnlocked = !cc.craftOnlyUnlocked; Config.save(); ref.screen.refresh(); }));
+        top.add(ruleButton("Min profit/craft", cc.craftMinProfit, new String[]{"1000", "0.5%", "1%", "2%", "5%"},
+                "Each craft must make at least this. Click to cycle: 1k, 0.5%, 1%, 2%, 5% of your budget. Exact value in Settings → Bazaar.",
+                v -> cc.craftMinProfit = v, ref));
         return new Page(new String[]{"Craft", "Cost", "Sells for", "Profit", "Margin", auction ? "" : "Per hour"},
                 new int[]{140, 60, 60, 60, 45, 60}, rows, top, footer);
     }

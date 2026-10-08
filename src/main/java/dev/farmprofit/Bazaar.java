@@ -363,18 +363,25 @@ public final class Bazaar {
 
     /** Minimum profit one flip order must make: fixed, or a % of your flip budget. 0 = off. */
     public static double minFlipProfit() {
-        Config c = Config.get();
-        return c.bzMinFlipAuto ? c.bzBudget * c.bzMinFlipPercent / 100.0 : c.bzMinFlipProfit;
+        return Config.rule(Config.get().flipMinProfit);
     }
 
     /** Minimum buy price per item: fixed, or a % of your flip budget (0.1% of 50m = 50k). 0 = off. */
     public static double minItemPrice() {
-        Config c = Config.get();
-        return c.bzMinItemPriceAuto ? c.bzBudget * c.bzMinItemPricePercent / 100.0 : c.bzMinItemPrice;
+        return Config.rule(Config.get().flipMinItemPrice);
+    }
+
+    /** How many flips "Safe flips only" hid in the last computeFlips(). */
+    public static int safeHidden;
+
+    /** Buy/sell gap as % of the instant-buy price (big = volatile / easy to manipulate). */
+    static double spreadOf(double[] b) {
+        return b[1] > 0 && b[0] > 0 ? (b[1] - b[0]) / b[1] * 100 : 0;
     }
 
     public static List<Flip> computeFlips() {
         Config c = Config.get();
+        safeHidden = 0;
         double tax = tax(), share = c.bzShare / 100.0;
         List<Flip> out = new ArrayList<>();
         for (var e : Prices.BOOK.entrySet()) {
@@ -402,6 +409,7 @@ public final class Bazaar {
             if (f.margin > 50) f.warnings.add("huge margin, maybe manipulated");
             if (b[4] + b[5] > 600) f.warnings.add("very competitive");
             if (f.hourlyVolume < 100) f.warnings.add("slow to fill");
+            if (c.craftFlipSafeOnly && (!f.warnings.isEmpty() || f.margin < 3 || spreadOf(b) > 25)) { safeHidden++; continue; }
             f.name = Prices.nameOf(f.id);
             out.add(f);
         }
@@ -440,9 +448,17 @@ public final class Bazaar {
 
     public static Hud.Lines hudLines() {
         Hud.Lines out = new Hud.Lines();
-        if (!Config.get().bazaarHud) return out;
+        if (Config.get().bazaarHud) addOrderLines(out);
+        Auctions.addHudLines(out);
+        if (out.isEmpty()) return out;
+        double today = profitSince(startOfDay());
+        if (today != 0 && Config.get().bzShowToday) out.add("§7Flip profit today: " + (today >= 0 ? "§6+" : "§c") + Fmt.coins(today));
+        return out;
+    }
+
+    private static void addOrderLines(Hud.Lines out) {
         List<Order> orders = state().orders;
-        if (orders.isEmpty()) return out;
+        if (orders.isEmpty()) return;
         double tied = 0;
         for (Order o : orders) tied += (o.qty - o.claimed) * o.price;
         out.add("§6§lBazaar §7" + orders.size() + " order" + (orders.size() > 1 ? "s" : "") + " §8(" + Fmt.coins(tied) + ")");
@@ -452,9 +468,22 @@ public final class Bazaar {
             if (shown++ >= max) { out.add("§8 ...and " + (orders.size() - max) + " more (/flips orders)"); break; }
             out.add(orderLine(o));
         }
-        double today = profitSince(startOfDay());
-        if (today != 0 && Config.get().bzShowToday) out.add("§7Flip profit today: " + (today >= 0 ? "§6+" : "§c") + Fmt.coins(today));
-        return out;
+    }
+
+    /** An Auction House buy (BIN or won bid): kept like a Bazaar buy, so selling it later logs the flip profit. */
+    static void addBought(String name, int qty, double totalCoins) {
+        Lot l = new Lot();
+        l.name = name; l.qty = Math.max(1, qty); l.cost = totalCoins / Math.max(1, qty);
+        state().lots.add(l);
+        traded(totalCoins);
+        save();
+    }
+
+    /** Coins collected from an Auction House sale. */
+    static void logAuctionSale(String name, int qty, double coins) {
+        logSale(name, qty, coins, coins / Math.max(1, qty));
+        traded(coins);
+        save();
     }
 
     public static String orderLine(Order o) {

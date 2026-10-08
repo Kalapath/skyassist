@@ -53,8 +53,8 @@ public final class TalismansScreen {
                         () -> { rarity = (rarity + 1) % RARITIES.length; ref[0].refresh(); }),
                 new Action("Crafting: " + (cfg.talismanUseCraft ? "§aON" : "§cOFF"), "Also consider crafting / upgrading when cheaper than the Auction House.",
                         () -> { cfg.talismanUseCraft = !cfg.talismanUseCraft; Config.save(); ref[0].refresh(); }),
-                new Action("Max price", "Set a maximum price (Settings → Items & areas).", () -> {
-                    SettingsScreen.selectTab("Items & areas");
+                new Action("Max price", "Set a maximum price (Settings → Items).", () -> {
+                    SettingsScreen.selectSection("Items", "Talismans");
                     Compat.setScreen(Minecraft.getInstance(), new SettingsScreen(ref[0]));
                 }),
                 new Action("Refresh", "Recalculate with the newest prices.", () -> ref[0].refresh()));

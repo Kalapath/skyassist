@@ -305,7 +305,7 @@ public final class MarketSignals {
         };
         List<Row> rows = new ArrayList<>();
         for (String[] l : lines) rows.add(new Row(l[0], "§7" + l[1]));
-        return new Page(new String[]{"", ""}, new int[]{90, 360}, rows, List.of(), List.of("§8Settings → Bazaar flipping: items analysed, history length, minimum samples / move / hit rate."));
+        return new Page(new String[]{"", ""}, new int[]{90, 360}, rows, List.of(), List.of("§8Settings → Bazaar → Market signals: items analysed, history length, minimum samples / move / hit rate."));
     }
 
     public static String status() { return status; }

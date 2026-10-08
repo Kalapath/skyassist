@@ -1,5 +1,20 @@
 # Changelog
 
+## 8.11.0
+- Best settings button / `/flips tune`: picks flip filters for the most profit per work from live prices and your budget; Undo / `/flips untune`.
+
+## 8.10.0
+- Flip HUD shows your AH listings (sold / expired / undercut) and bids (top / outbid / won); AH buys and sales count in flip profit.
+
+## 8.9.0
+- Craft flips (Bazaar and AH) respect your collections, slayer levels, HotM tier and skills (read from menus and level-up chat).
+- New settings: Only recipes I can craft (on), Hide when level unknown (off).
+
+## 8.8.0
+- Safe flips only applies to normal Bazaar flips too (shared switch, toggle on Best flips, `/flips set safe`).
+- Settings reorganised: 14 tabs with section headings, new Advanced tab, Kuudra/Diana in Combat, macros in Extras.
+- Min item price / min profit per flip / craft min profit: one box each, coins or % of budget (old values migrated).
+
 ## 8.7.3
 - Bazaar flips: min item price (fixed or % of budget) instead of max items.
 

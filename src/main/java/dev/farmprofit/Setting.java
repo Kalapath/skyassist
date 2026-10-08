@@ -22,4 +22,8 @@ public @interface Setting {
     double max() default Double.MAX_VALUE;
     /** Kept in config.json but not shown in the menu (e.g. replaced by the HUD editor). */
     boolean hidden() default false;
+    /** Heading this setting sits under inside its tab. */
+    String section() default "";
+    /** Position in the menu (lower = higher up). */
+    int order() default 100000;
 }

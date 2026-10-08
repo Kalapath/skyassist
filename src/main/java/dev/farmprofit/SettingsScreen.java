@@ -25,7 +25,7 @@ import java.util.Map;
 public final class SettingsScreen extends Screen {
     private static final String OTHER = "Other", HIDDEN = "Hidden items", RESULTS = "Search";
     private static final List<String> ORDER = List.of("General", "HUD", "Farming", "Mining", "Foraging", "Fishing",
-            "Combat & Slayers", "Dungeons", "Kuudra", "Diana", "Bazaar flipping", "Items & areas", "Chat & sounds", "Keybinds & macros", "Timers", "Extras");
+            "Combat", "Dungeons", "Bazaar", "Items", "Chat & sounds", "Timers", "Extras", "Advanced");
     private static String category;
     private static String query = "";
     private final Screen parent;
@@ -53,6 +53,7 @@ public final class SettingsScreen extends Screen {
             if (s == null) other.add(f);
             else map.computeIfAbsent(s.category(), k -> new ArrayList<>()).add(f);
         }
+        for (List<Field> list : map.values()) list.sort(java.util.Comparator.comparingInt(SettingsScreen::orderOf));
         Map<String, List<Field>> sorted = new LinkedHashMap<>();
         for (String c : ORDER) if (map.containsKey(c)) sorted.put(c, map.get(c));
         map.forEach(sorted::putIfAbsent);
@@ -71,6 +72,16 @@ public final class SettingsScreen extends Screen {
     private static String desc(Field f) {
         Setting s = f.getAnnotation(Setting.class);
         return s != null && !s.desc().isEmpty() ? s.desc() : "Setting \"" + f.getName() + "\" in config.json";
+    }
+
+    private static int orderOf(Field f) {
+        Setting s = f.getAnnotation(Setting.class);
+        return s == null ? 100000 : s.order();
+    }
+
+    private static String sectionOf(Field f) {
+        Setting s = f.getAnnotation(Setting.class);
+        return s == null ? "" : s.section();
     }
 
     private static String tabOf(Field f) {
@@ -156,14 +167,47 @@ public final class SettingsScreen extends Screen {
             return;
         }
 
-        int pages = Math.max(1, (fields.size() + perPage - 1) / perPage);
+        // rows: a String is a section heading, a Field a setting. A page never ends on a heading.
+        List<Object> entries = new ArrayList<>();
+        String lastSection = null;
+        for (Field f : fields) {
+            String sec = category.equals(RESULTS) ? "" : sectionOf(f);
+            if (!sec.isEmpty() && !sec.equals(lastSection)) entries.add(sec);
+            lastSection = sec;
+            entries.add(f);
+        }
+        List<List<Object>> pagesList = new ArrayList<>();
+        List<Object> cur = new ArrayList<>();
+        String curSection = null;
+        for (int i = 0; i < entries.size(); i++) {
+            Object e = entries.get(i);
+            if (e instanceof String sec) curSection = sec;
+            boolean full = !cur.isEmpty() && (cur.size() >= perPage || (e instanceof String && cur.size() >= perPage - 1));
+            if (full) {
+                pagesList.add(cur);
+                cur = new ArrayList<>();
+                if (e instanceof Field && curSection != null) cur.add(curSection + " (continued)");
+            }
+            cur.add(e);
+        }
+        if (!cur.isEmpty()) pagesList.add(cur);
+        int pages = Math.max(1, pagesList.size());
+        if (pendingSection != null) {
+            for (int p = 0; p < pagesList.size(); p++) if (pagesList.get(p).contains(pendingSection)) { page = p; break; }
+            pendingSection = null;
+        }
         page = Math.max(0, Math.min(page, pages - 1));
         if (fields.isEmpty()) addRenderableWidget(new StringWidget(left, top + 6, 300, 10, Component.literal("§7No settings match."), font));
+        List<Object> shown = pagesList.isEmpty() ? List.of() : pagesList.get(page);
         int row = 0;
-        for (int i = page * perPage; i < Math.min(fields.size(), (page + 1) * perPage); i++, row++) {
-            Field f = fields.get(i);
-            int ry = top + row * rowH;
-            String text = label(f) + (category.equals(RESULTS) ? " §8(" + tabOf(f) + ")" : "");
+        for (Object e : shown) {
+            int ry = top + row++ * rowH;
+            if (e instanceof String sec) {
+                addRenderableWidget(new StringWidget(left, ry + 10, labelW + controlW + 34, 10, Component.literal("§e§l" + sec), font));
+                continue;
+            }
+            Field f = (Field) e;
+            String text = "  " + label(f) + (category.equals(RESULTS) ? " §8(" + tabOf(f) + (sectionOf(f).isEmpty() ? "" : " › " + sectionOf(f)) + ")" : "");
             StringWidget lbl = new StringWidget(left, ry + 6, labelW, 10, Component.literal(text), font);
             lbl.setTooltip(Tooltip.create(Component.literal(desc(f))));
             addRenderableWidget(lbl);
@@ -193,6 +237,14 @@ public final class SettingsScreen extends Screen {
             }).bounds(width / 2 - 50, by, 70, 20).build();
             resetTab.setTooltip(Tooltip.create(Component.literal("Puts every setting in this tab back to its default.")));
             addRenderableWidget(resetTab);
+        }
+        if (category.equals("Bazaar")) {
+            addRenderableWidget(Button.builder(Component.literal("§6★ Best settings"), b -> {
+                applyPending();
+                FlipTuner.tuneAndReport();
+                rebuildWidgets();
+            }).bounds(10, by, 100, 20).build()).setTooltip(Tooltip.create(Component.literal(
+                    "Sets the flip filters for the most profit per bit of work, using today's prices and your budget. /flips untune to undo.")));
         }
         if (category.equals("HUD")) {
             addRenderableWidget(Button.builder(Component.literal("Edit HUD layout"), b -> {
@@ -337,6 +389,14 @@ public final class SettingsScreen extends Screen {
     public static void requestOpen() { openNextTick = true; }
 
     public static void selectTab(String tab) { category = tab; query = ""; }
+
+    /** Opens on the tab and page holding this setting's section heading. */
+    public static void selectSection(String tab, String section) {
+        selectTab(tab);
+        pendingSection = section;
+    }
+
+    private static String pendingSection;
 
     public static void requestOpen(String tab) { category = tab; query = ""; openNextTick = true; }
 

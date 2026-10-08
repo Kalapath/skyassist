@@ -85,7 +85,7 @@ public final class Commands {
         add("Tools", "/shards set <shard> <level> <have>", "Fix a shard by hand, e.g. /shards set Grove 3 5 (level 3, already have 5).");
         add("Tools", "/itemsearch", "Everything in your Ender Chest and backpacks, searchable, with where it is (menu).");
         add("Tools", "/waypoints", "Waypoints from party chat and Crystal Hollows places; share or remove them (menu).");
-        add("Tools", "Macro keys", "Six keys that run commands: set keys in Controls → SkyAssist, commands in Settings → Keybinds & macros.");
+        add("Tools", "Macro keys", "Six keys that run commands: set keys in Controls → SkyAssist, commands in Settings → Extras.");
         add("Tools", "/hotm", "Best Heart of the Mountain trees: powder grinding, gemstones, mithril, glacite, starting out.");
         add("Tools", "/hotf", "Best Heart of the Forest trees: Fig (Forest Whispers), Helix (Desert Whispers), basics.");
         add("Tools", "/greenhouse", "Pick a mutation: what to unlock first, and a planting layout in the world (menu).");

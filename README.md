@@ -51,6 +51,41 @@ Open chat (**T**). While chat is open:
 Detected automatically from your purse on the sidebar when a quest starts (handles Aatrox discounts etc.).
 If you'd rather use a fixed number, set `slayerQuestCost` in the config (anything above 0 overrides auto-detection).
 
+## New in 8.11.0
+- **★ Best settings** (every /flips tab, Settings → Bazaar, or `/flips tune`): tries ~500 combinations of min item price,
+  min margin, min volume and number of orders on today's Bazaar prices with your budget, and keeps the one with the most
+  profit per bit of work. Work per order goes up when an item is fought over (lots of orders → you get outbid and relist),
+  fills slowly, or means moving thousands of items. Score = profit/h ÷ work^0.7, so a few big calm flips beat many small busy
+  ones unless the extra orders clearly pay. It also turns Safe only on, sets min profit per flip / per craft and the hot-flip
+  alert to match, and tells you what running more orders would earn and cost. **↺ Undo** / `/flips untune` restores your settings.
+  Budget and volume share are left as you set them.
+
+## New in 8.10.0
+- **Auctions on the flip HUD** (the panel is now "Bazaar & AH flips"): your listings with price and time left, marked
+  **sold, claim it**, **expired**, or **undercut → lowest BIN**; your bids marked **top**, **outbid** or **won, claim it**.
+  A ding when something sells or you're outbid.
+- Read from chat (auction started, sold, collected, bid placed, outbid, claimed, BIN purchase) and from **/ah → Manage
+  Auctions / Your Bids** (open them once to pick up auctions made before updating; the menus always win).
+- AH buys (BIN or won bids) count as flip buys, so selling them later (AH or Bazaar) shows the profit in the flip log and
+  "Flip profit today". Settings → Bazaar → Your orders: Show auctions on HUD, how many to list.
+
+## New in 8.9.0
+- **Craft flips only show what you can craft.** Each recipe's requirement (collection tier, slayer level, HotM tier or
+  skill, e.g. "Diamond VIII", "Zombie Slayer 5", "HotM 5") is checked against your own levels. SkyAssist reads them when
+  you open your **/collection** categories, the **slayer menu**, **/skills** and **/hotm**, and keeps them up to date from
+  level-up messages in chat (saved in `config/skyassist/unlocks.json`).
+- Locked recipes are hidden (both Craft → Bazaar and Craft → AH). Recipes whose requirement SkyAssist hasn't seen yet are
+  shown with a note, or hidden too with *Hide when level unknown*. Toggle with "Only what I can craft" on the craft tabs or
+  in Settings → Bazaar → Craft flips. The footer shows how many levels are known and how many recipes were hidden.
+
+## New in 8.8.0
+- **Safe flips only** now works for normal Bazaar flips too (one switch for every flip tab, also on the Best flips tab and
+  `/flips set safe on`). It hides flips with a ⚠ warning, under 3% margin, or a buy/sell gap over 25%; the footer says how many it hid.
+- **Tidier settings**: 14 tabs instead of 16 (Kuudra and Diana moved into Combat, macro keys into Extras), every tab split into
+  headed sections, main on/off switches first, and URLs / counting rules / extra areas moved to a new **Advanced** tab.
+- Flip filters are one box each now: type coins (`50k`) or a % of your budget (`0.1%`) into *Min item price*, *Min profit per
+  flip* and *Craft flips: min profit*. Your old settings are carried over. In the flips menu the buttons cycle through presets.
+
 ## New in 8.7.3
 - Bazaar flips: **min item price** (fixed, or ☐ a % of your budget — 0.1% of 50m = 50k each) so cheap items you'd need
   thousands of don't show. Replaces "max items per flip".
@@ -74,7 +109,7 @@ If you'd rather use a fixed number, set `slayerQuestCost` in the config (anythin
 - **Events**: the same around past Spooky Festivals, Seasons of Jerry and New Years.
 - **Trends**: prices unusually low / high vs. the last 7 days (z-score), with 24 h and 7 d change.
 - **Backtest**: each signal is checked against every past case (leave-one-out); only signals that were right often enough
-  are shown, with their hit rate (e.g. 4/5). Thresholds in Settings → Bazaar flipping.
+  are shown, with their hit rate (e.g. 4/5). Thresholds in Settings → Bazaar.
 - Data is cached for a day in `config/skyassist/market`; the first load takes a minute or two in the background.
 
 ## New in 8.6
@@ -186,7 +221,7 @@ If you'd rather use a fixed number, set `slayerQuestCost` in the config (anythin
 2. **Shaders**: with an Iris shader pack on, highlights switch to particle boxes automatically (Highlight style setting).
 3. **Clash-free start**: with SkyHanni / Skyblocker installed, SkyAssist's HUD starts on the right under the scoreboard.
 4. **What do you play?** in the setup screen (`/profit setup`): one click switches an activity's HUD + helpers.
-5. **Macro keys**: 6 keys that run commands (Controls → SkyAssist; commands in Settings → Keybinds & macros).
+5. **Macro keys**: 6 keys that run commands (Controls → SkyAssist; commands in Settings → Extras).
 6. **Inquisitor sharing**: [Share with party] (or auto-share) when you dig one up; party coordinates from anyone
    (SkyAssist, SkyHanni or typed) become a light beam + HUD arrow. `/waypoints` to share / remove.
 7. **Mineshaft alert**: ding + big HUD line + [Share with party] when you find a Glacite Mineshaft.
@@ -255,7 +290,7 @@ Like SkyHanni's Powder Chest Timer / Powder Grinding Tracker and Skyblocker's Tr
 - **Sack items were counted about twice** (Hypixel repeats the same list on several parts of the "[Sacks]" message);
   each list is now read once, so the HUD matches your sacks.
 - **Rarity colors**: every item's slot is tinted in its rarity color in menus and on the hotbar
-  (Settings → Items & areas: on/off, hotbar on/off, strength).
+  (Settings → Items: on/off, hotbar on/off, strength).
 - **"Best now" is off on the Farming HUD** (Farming → Best crop on Farming HUD to bring it back; `/profit suggest` still has it).
 
 ## New in 6.3
@@ -338,7 +373,7 @@ add `chat` to get the old chat output (e.g. `/profit history chat`, `/flips chat
   Auction House (lowest BIN) and crafting. Upgrade chains are understood (Talisman → Ring → Artifact): if you own a lower
   tier, only the extra MP counts and the part you own is free in the craft cost. One entry per chain (the best value tier).
   Click an entry to search the AH or open its recipe. What you own is read when you open your **Accessory Bag** (open
-  every page once, and again after buying). Settings → Items & areas: how many to list, include crafting, max price.
+  every page once, and again after buying). Settings → Items: how many to list, include crafting, max price.
   Accessories only sold by NPCs or not tradeable have no price here and are skipped.
 
 ## New in 5.1
@@ -366,12 +401,12 @@ Each one can be turned off in Settings → Dungeons. Still not included: Boulder
 
 ## New in 4.3
 - Scrollable tooltips: item descriptions taller than the screen can be scrolled with the mouse wheel while you hover
-  the item in a menu. The name stays at the top and "▲ / ▼ N more" shows what's hidden. Settings → Items & areas.
+  the item in a menu. The name stays at the top and "▲ / ▼ N more" shows what's hidden. Settings → Items.
 
 ## New in 4.2
 - Enchantment colors in tooltips: **perfect** (absolute max, gold + ✦), **great** (above the enchanting-table max, purple),
   **good** (table max, blue), **low** (gray). Ultimate enchants stay bold. All colors (including rainbow) are in
-  Settings → Items & areas. Max levels come from the public SkyKings Bot-Data file, so new enchants work automatically.
+  Settings → Items. Max levels come from the public SkyKings Bot-Data file, so new enchants work automatically.
   If you also run SkyHanni, the duplicate check offers to turn one of the two off.
 
 ## New in 4.1
@@ -402,7 +437,7 @@ Each one can be turned off in Settings → Dungeons. Still not included: Boulder
 
 ## New in 3.1
 - Combat sessions only start after real fighting: 5 mob hits within 30 s (players, NPCs and armor stands never count),
-  or a slayer quest. Both are adjustable in Combat & Slayers settings.
+  or a slayer quest. Both are adjustable in Settings → Combat.
 - The HUD follows what you do: it switches as soon as you do something else (farm, chop, fish...) and when you arrive
   on a new island. Unknown log blocks on foraging islands are counted too, so Galatea woods always start a session.
 - About 50 new settings: HUD look (opacity, line height, shadow, which lines show, number format),
@@ -438,7 +473,7 @@ Hypixel and no longer depends on the tab list's Area line. Without it, the tab l
 ## Settings menu
 Press **O** (rebind it in Options → Controls → Key Binds → "SkyAssist"), or use `/profit settings`,
 to open a menu with **every** setting, grouped into tabs:
-General, HUD, Farming, Mining, Foraging, Fishing, Combat & Slayers, Dungeons, Bazaar flipping, Items & areas.
+General, HUD, Farming, Mining, Foraging, Fishing, Combat (incl. Kuudra and Diana), Dungeons, Bazaar, Items, Chat & sounds, Timers, Extras (incl. macro keys) and Advanced (data URLs, counting rules, extra areas/blocks). Each tab is split into headed sections.
 Each activity tab also has a switch to hide that activity's HUD (tracking keeps running).
 Hover a setting for an explanation. On/off settings are buttons, choices cycle when clicked, numbers accept
 `10m` / `500k`, lists are comma separated and item/block maps use `name=ID, name2=ID2`.

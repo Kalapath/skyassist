@@ -65,7 +65,7 @@ public final class Menus {
         for (String c : CHESTS) if (title.contains(c)) kind = "chest";
         // menus fill in a tick or two after opening: look again until there's something to read
         analysed = !items.isEmpty() || ++waited > 20;
-        if (!items.isEmpty()) { Accessories.scanMenu(title, items); Greenhouse.noticeItems(items, false); Shards.scanMenu(title, items); Storage.scanMenu(title, items); VisitorShop.scanMenu(title, items); }
+        if (!items.isEmpty()) { Accessories.scanMenu(title, items); Greenhouse.noticeItems(items, false); Shards.scanMenu(title, items); Unlocks.scanMenu(title, items); Auctions.scanMenu(title, items); Storage.scanMenu(title, items); VisitorShop.scanMenu(title, items); }
         if (analysed) {
             if ("chest".equals(kind)) analyseChestScreen(title, items);
             else analyseCroesus(items);

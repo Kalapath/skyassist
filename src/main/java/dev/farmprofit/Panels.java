@@ -26,7 +26,7 @@ public final class Panels {
 
     public static String title(String id) {
         return switch (id) {
-            case "bazaar" -> "Bazaar orders";
+            case "bazaar" -> "Bazaar & AH flips";
             case "greenhouse" -> "Greenhouse planter";
             case "waypoints" -> "Waypoints";
             case "timers" -> "Timers";

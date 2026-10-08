@@ -41,7 +41,11 @@ final class FlipsCommand {
                     Tracker.say("§6[Flips] §7Bazaar HUD " + (Config.get().bazaarHud ? "§aon" : "§coff"));
                     return 1;
                 }))
-                .then(ClientCommands.literal("settings").executes(ctx -> { settings(); SettingsScreen.requestOpen("Bazaar flipping"); return 1; }))
+                .then(ClientCommands.literal("tune").executes(ctx -> { FlipTuner.tuneAndReport(); return 1; }))
+                .then(ClientCommands.literal("untune").executes(ctx -> {
+                    Tracker.say(FlipTuner.undo() ? "§6[Flips] §7Settings restored." : "§6[Flips] §7Nothing to undo.");
+                    return 1; }))
+                .then(ClientCommands.literal("settings").executes(ctx -> { settings(); SettingsScreen.requestOpen("Bazaar"); return 1; }))
                 .then(ClientCommands.literal("set")
                         .then(ClientCommands.argument("setting", StringArgumentType.word())
                                 .then(ClientCommands.argument("value", StringArgumentType.word()).executes(ctx -> {
@@ -151,7 +155,9 @@ final class FlipsCommand {
         Tracker.say(" §7maxprice §f" + (c.bzMaxPrice > 0 ? Fmt.coins(c.bzMaxPrice) : "none") + "  §7tax §f" + c.bzTax + "%"
                 + "  §7share §f" + c.bzShare + "%");
         Tracker.say(" §7alert §f" + (c.bzFlipAlert > 0 ? Fmt.coins(c.bzFlipAlert) + "/h" : "off") + "  §7top §f" + c.bzTop
-                + "  §7sound §f" + (c.bzSound ? "on" : "off"));
+                + "  §7sound §f" + (c.bzSound ? "on" : "off") + "  §7safe §f" + (c.craftFlipSafeOnly ? "on" : "off"));
+        Tracker.say(" §7minprice §f" + c.flipMinItemPrice + "  §7minprofit §f" + c.flipMinProfit + "  §7craftprofit §f" + c.craftMinProfit
+                + " §8(coins like 50k, or % of budget like 1%)");
     }
 
     private static void set(String key, String value) {
@@ -160,6 +166,17 @@ final class FlipsCommand {
         String k = key.toLowerCase(Locale.ROOT);
         if (k.equals("sound")) {
             c.bzSound = value.equalsIgnoreCase("on") || value.equalsIgnoreCase("true");
+        } else if (k.equals("safe")) {
+            c.craftFlipSafeOnly = value.equalsIgnoreCase("on") || value.equalsIgnoreCase("true");
+        } else if (k.equals("minprice") || k.equals("minprofit") || k.equals("craftprofit")) {
+            String rule = value.equalsIgnoreCase("off") ? "0" : value.trim();
+            if (!rule.endsWith("%") && Double.isNaN(v) && !rule.equals("0")) {
+                Tracker.say("§6[Flips] §c\"" + value + "\" isn't an amount. §7Examples: 50k, 1%, off");
+                return;
+            }
+            if (k.equals("minprice")) c.flipMinItemPrice = rule;
+            else if (k.equals("minprofit")) c.flipMinProfit = rule;
+            else c.craftMinProfit = rule;
         } else if (Double.isNaN(v) && !(k.equals("alert") || k.equals("maxprice"))) {
             Tracker.say("§6[Flips] §c\"" + value + "\" isn't a number. §7Examples: 10m, 500k, 1.25");
             return;
@@ -175,7 +192,7 @@ final class FlipsCommand {
                 case "alert" -> c.bzFlipAlert = v;
                 case "top" -> c.bzTop = (int) Math.max(1, Math.min(50, v));
                 default -> {
-                    Tracker.say("§6[Flips] §7Unknown setting. Use: budget, minvolume, minmargin, maxprice, tax, share, alert, top, sound");
+                    Tracker.say("§6[Flips] §7Unknown setting. Use: budget, minvolume, minmargin, maxprice, tax, share, alert, top, sound, safe, minprice, minprofit, craftprofit");
                     return;
                 }
             }

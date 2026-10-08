@@ -31,7 +31,7 @@ final class HudRenderer {
         int lh = Math.max(8, Math.min(20, cfg.hudLineHeight));
         int nextY = -1, nextX = -1;                           // where an un-placed panel goes (under the previous one)
         for (String id : Panels.ALL) {
-            if (id.equals("bazaar") && !cfg.bazaarHud) continue;
+            if (id.equals("bazaar") && !cfg.bazaarHud && !cfg.auctionHud) continue;
             if (!cfg.separatePanels && (id.equals("secrets") || id.equals("contest") || id.equals("suggest"))) continue;
             String key = Panels.key(id, activity);
             Panels.Pos pos = Panels.get(key);

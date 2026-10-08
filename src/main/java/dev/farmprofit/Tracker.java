@@ -654,11 +654,13 @@ public final class Tracker {
         }
         Mineshafts.onChat(plain);
         if (Bazaar.handle(plain)) return;
+        if (Auctions.onChat(plain)) return;
         if (Puzzles.onChat(plain)) return;
         if (PowderChests.onChat(plain)) return;
         if (WorldPuzzles.onChat(plain)) return;
 
         scanShards(plain);
+        Unlocks.onChat(plain);
 
         Matcher pk = PEST_KILL.matcher(plain);
         if (pk.matches()) {

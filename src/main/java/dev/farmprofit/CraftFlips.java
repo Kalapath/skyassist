@@ -18,12 +18,14 @@ public final class CraftFlips {
     public static final Map<String, Integer> SKIPPED = new java.util.LinkedHashMap<>();
     public static int checked;
 
+    /** Recipes hidden last time because you haven't unlocked them / whose requirement is unknown. */
+    public static int locked, unknown;
+
     private static void skip(String why) { SKIPPED.merge(why, 1, Integer::sum); }
 
     /** Minimum profit per craft: fixed, or a % of your flip budget. */
     public static double minProfit() {
-        Config c = Config.get();
-        return c.craftFlipAutoMinProfit ? c.bzBudget * c.craftFlipAutoPercent / 100.0 : c.craftFlipMinProfit;
+        return Config.rule(Config.get().craftMinProfit);
     }
 
     /** Gap between instant-buy and instant-sell, as % of instant-buy (big = volatile / easy to manipulate). */
@@ -49,6 +51,8 @@ public final class CraftFlips {
         SKIPPED.clear();
         checked = 0;
         double minProfit = minProfit();
+        locked = 0;
+        unknown = 0;
         for (var e : CraftCost.recipes().entrySet()) {
             checked++;
             String id = e.getKey();
@@ -98,6 +102,18 @@ public final class CraftFlips {
             if (margin < c.bzMinMargin) { skip("below your min margin"); continue; }
             if (margin > (c.craftFlipSafeOnly ? 100 : 500)) { skip(c.craftFlipSafeOnly ? "possibly inflated (100%+ margin)" : "unrealistic margin (bad data)"); continue; }
             if (c.craftFlipSafeOnly && !toAuction && margin < 3) { skip("competitive (under 3% margin, gets undercut)"); continue; }   // >500% is almost always bad data
+            Unlocks.Req req = Unlocks.requirement(id);
+            if (req != null && c.craftOnlyUnlocked) {
+                Boolean met = req.met();
+                if (Boolean.FALSE.equals(met)) { locked++; skip("not unlocked for you yet"); continue; }
+                if (met == null) {
+                    if (c.craftHideUnknown) { unknown++; skip("requirement unknown (open that collection)"); continue; }
+                    unknown++;
+                    note = "Needs " + req.text() + " (your level isn't known yet: open that collection / menu)" + (note != null ? ". " + note : "");
+                }
+            } else if (req != null && Boolean.FALSE.equals(req.met())) {
+                note = "§cYou don't have " + req.text() + " yet" + (note != null ? "§e. " + note : "");
+            }
             String ingredients = list.length() > 2 ? list.substring(0, list.length() - 2) : "";
             out.add(new Flip(id, Prices.nameOf(id), cost, sell, profit, margin, perHour, makes, ingredients, note));
         }
