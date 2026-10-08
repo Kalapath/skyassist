@@ -51,6 +51,7 @@ public final class Debug {
         Tracker.say(" " + maybe(Lockpick.hooked ? Boolean.TRUE : null) + " §7Particle hook (lockpick)  " + maybe(Glow.hooked ? Boolean.TRUE : null) + " §7Glow hook  " + maybe(Sounds.hooked ? Boolean.TRUE : null) + " §7Sound hook");
         Tracker.say(" §7Rarity colors: " + (RarityBg.canDrawItems == null ? "§8? (open a menu)" : RarityBg.canDrawItems ? "§abehind items" : "§elight tint (can't redraw items here)"));
         Tracker.say(" §7Pests seen right now: §f" + Pests.count() + (Tracker.FARMING.equals(Tracker.area) ? "" : " §8(only searched in the Garden)"));
+        Tracker.say(" " + ok(MiningEvents.ok) + " §7Mining events service §8(" + Config.get().miningEventsUrl + ")");
         Tracker.say(" §7Shaders: " + (Glow.shadersOn() ? "§eon §8(highlights use particle boxes)" : "§aoff") + "  §7Highlight style: §f" + Config.get().glowStyle);
         Tracker.say(" §7Attribute shards known: §f" + Shards.count() + " §8(Bazaar products with SHARD: " + Prices.BOOK.keySet().stream().filter(k -> k.contains("SHARD")).count() + ")");
         Tracker.say(" " + ok(Shards.count() > 0) + " §7Shards known §8(" + Shards.count() + ")  " + maybe(InvSearch.works) + " §7Inventory search");

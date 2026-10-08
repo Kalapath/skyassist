@@ -98,7 +98,9 @@ public final class Timers {
             long secOfHour = n % 3600, until = secOfHour < 55 * 60 ? 55 * 60 - secOfHour : 3600 - secOfHour + 55 * 60;
             out.add(" §5Dark Auction " + (secOfHour >= 55 * 60 && secOfHour < 58 * 60 ? "§anow" : "§7in §f" + Fmt.clock(until * 1000)));
         }
-        if (c.timerMiningEvent) {
+        if (c.timerMiningEvent && !MiningEvents.lines().isEmpty()) {
+            for (String l : MiningEvents.lines()) out.add(l);            // from the shared service: works anywhere
+        } else if (c.timerMiningEvent) {
             String ev = null;
             for (List<String> src : List.of(Tracker.tabLines, Tracker.sidebarLines)) for (String l : src) {
                 String up = l.toUpperCase(Locale.ROOT);

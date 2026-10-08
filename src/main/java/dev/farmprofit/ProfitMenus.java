@@ -345,7 +345,7 @@ public final class ProfitMenus {
     private static Page logPage() {
         List<Row> rows = new ArrayList<>();
         for (var e : Bazaar.state().log) {
-            rows.add(new Row("§8" + DATE.format(new Date(e.time)), "§f" + e.qty + "x " + e.name, "§7" + Bazaar.Fmt1(e.buy) + " → " + Bazaar.Fmt1(e.sell),
+            rows.add(new Row("§8" + DATE.format(new Date(e.time)), "§f" + e.qty + "x " + e.name + (e.craft ? " §8(craft)" : ""), "§7" + Bazaar.Fmt1(e.buy) + " → " + Bazaar.Fmt1(e.sell),
                     (e.profit >= 0 ? "§a+" : "§c") + Fmt.coins(e.profit)));
         }
         return new Page(new String[]{"When", "Item", "Bought → sold", "Profit"}, new int[]{70, 170, 120, 80}, rows, List.of(),

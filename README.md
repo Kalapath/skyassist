@@ -51,6 +51,21 @@ Open chat (**T**). While chat is open:
 Detected automatically from your purse on the sidebar when a quest starts (handles Aatrox discounts etc.).
 If you'd rather use a fixed number, set `slayerQuestCost` in the config (anything above 0 overrides auto-detection).
 
+## New in 8.6
+- **Craft flips count in flip profit**: selling an item you crafted from Bazaar-bought ingredients logs a craft flip
+  (cost = what you paid for the ingredients, 2 levels deep, the rest at today's price). Instant buys and instant sells
+  are now read too. Craft flips are marked "(craft)" in the profit log.
+
+## New in 8.5.3
+- Crafting / Bazaar flipping no longer leaks into profit HUDs: right after a menu (crafting, Bazaar, chests) only the
+  activity's own items count, and items clearly from another activity (fish on Farming, crops on Mining...) never count.
+  Visitor rewards and dungeon / Croesus chests still count as before.
+
+## New in 8.5.2
+- Mining events from anywhere: the Timers panel shows the current Dwarven Mines and Crystal Hollows events with time
+  left, read from Soopy's shared mining-event service (the one SkyHanni's Mining Event Tracker uses). Falls back to your
+  own tab list if the service is down. `/profit debug` shows whether it's reachable.
+
 ## New in 8.5.1
 - Boss timers in the Timers panel, each with a switch: Broodmother, Endstone Protector, Ender Dragon, Arachne, Kuudra,
   Vanquisher, Golden Goblin. Their state is read from Hypixel's tab list on their island and remembered with

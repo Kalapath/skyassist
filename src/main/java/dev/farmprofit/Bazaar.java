@@ -28,6 +28,8 @@ public final class Bazaar {
     private static final Pattern CLAIM_SELL = Pattern.compile("\\[Bazaar\\] Claimed " + NUM + " coins from selling " + NUM + "x (.+?) at " + NUM + " each", Pattern.CASE_INSENSITIVE);
     private static final Pattern CANCEL_BUY = Pattern.compile("\\[Bazaar\\] Cancelled! Refunded " + NUM + " coins from cancelling (?:a |your )?Buy Order", Pattern.CASE_INSENSITIVE);
     private static final Pattern CANCEL_SELL = Pattern.compile("\\[Bazaar\\] Cancelled! Refunded " + NUM + "x (.+?) from cancelling (?:a |your )?Sell Offer", Pattern.CASE_INSENSITIVE);
+    private static final Pattern INSTA_BUY = Pattern.compile("\\[Bazaar\\] Bought " + NUM + "x (.+?) for " + NUM + " coins", Pattern.CASE_INSENSITIVE);
+    private static final Pattern INSTA_SELL = Pattern.compile("\\[Bazaar\\] Sold " + NUM + "x (.+?) for " + NUM + " coins", Pattern.CASE_INSENSITIVE);
     private static final Pattern FLIPPED = Pattern.compile("\\[Bazaar\\] Order Flipped! " + NUM + "x (.+?) for " + NUM + " coins", Pattern.CASE_INSENSITIVE);
     private static final double EPS = 0.05;
     private static final int MAX_ORDER = 71680;
@@ -49,6 +51,8 @@ public final class Bazaar {
 
     public static final class Entry {
         public long time; public String name; public int qty; public double buy, sell, profit;
+        /** true = a craft flip (ingredients bought, the crafted item sold) */
+        public boolean craft;
     }
 
     public static final class State {
@@ -122,15 +126,7 @@ public final class Bazaar {
             int qty = (int) num(m.group(2));
             String name = m.group(3).trim();
             double sellEach = num(m.group(4));
-            Double cost = takeCost(name, qty);
-            if (cost != null) {
-                Entry e = new Entry();
-                e.time = System.currentTimeMillis(); e.name = name; e.qty = qty;
-                e.buy = cost; e.sell = sellEach; e.profit = coins - cost * qty;
-                st.log.add(0, e);
-                while (st.log.size() > 1000) st.log.remove(st.log.size() - 1);
-                Tracker.say("§6[Flips] §7Sold §f" + qty + "x " + name + " §7profit " + (e.profit >= 0 ? "§a+" : "§c") + Fmt.coins(e.profit));
-            }
+            logSale(name, qty, coins, sellEach);
             Order o = find("sell", name, x -> true);
             if (o != null) { o.claimed += qty; if (o.claimed >= o.qty) st.orders.remove(o); }
             save(); return true;
@@ -148,6 +144,21 @@ public final class Bazaar {
                 if (best == null || Math.abs((o.qty - o.claimed) * o.price - refund) < Math.abs((best.qty - best.claimed) * best.price - refund)) best = o;
             }
             if (best != null) st.orders.remove(best);
+            save(); return true;
+        }
+        if ((m = INSTA_BUY.matcher(msg)).find()) {
+            int qty = (int) num(m.group(1));
+            Lot lot = new Lot(); lot.name = m.group(2).trim(); lot.qty = qty; lot.cost = num(m.group(3)) / Math.max(1, qty);
+            st.lots.add(lot);
+            traded(num(m.group(3)));
+            save(); return true;
+        }
+        if ((m = INSTA_SELL.matcher(msg)).find()) {
+            int qty = (int) num(m.group(1));
+            String name = m.group(2).trim();
+            double coins = num(m.group(3));
+            logSale(name, qty, coins, coins / Math.max(1, qty));
+            traded(coins);
             save(); return true;
         }
         if ((m = FLIPPED.matcher(msg)).find()) {
@@ -179,6 +190,74 @@ public final class Bazaar {
     private static Order find(String type, String name, java.util.function.Predicate<Order> pred) {
         for (Order o : state().orders) if (o.type.equals(type) && o.name.equalsIgnoreCase(name) && pred.test(o)) return o;
         return null;
+    }
+
+    /**
+     * A sale: profit against what you paid. Same item bought before = normal flip. Otherwise, if it has a recipe and you
+     * bought (some of) its ingredients = craft flip: cost from your bought ingredients (2 levels deep), anything you
+     * didn't buy priced at today's instant-buy price.
+     */
+    private static void logSale(String name, int qty, double coins, double sellEach) {
+        State st = state();
+        double[] same = takeLots(name, qty);
+        double cost;
+        boolean craft = false;
+        if (same[1] >= qty) cost = same[0];
+        else {
+            double[] c = craftCost(name, qty - (int) same[1], 2);
+            if (c[1] <= 0 && same[1] == 0) return;                          // nothing you bought went into this: not a flip
+            cost = same[0] + c[0];
+            craft = c[1] > 0;
+        }
+        Entry e = new Entry();
+        e.time = System.currentTimeMillis(); e.name = name; e.qty = qty; e.craft = craft;
+        e.buy = cost / Math.max(1, qty); e.sell = sellEach; e.profit = coins - cost;
+        st.log.add(0, e);
+        while (st.log.size() > 1000) st.log.remove(st.log.size() - 1);
+        Tracker.say("§6[Flips] §7Sold §f" + qty + "x " + name + (craft ? " §8(craft flip)" : "") + " §7profit " + (e.profit >= 0 ? "§a+" : "§c") + Fmt.coins(e.profit));
+    }
+
+    /** Takes up to qty items out of your bought lots: {total cost, how many were found}. */
+    private static double[] takeLots(String name, int qty) {
+        double total = 0;
+        int got = 0;
+        for (Iterator<Lot> it = state().lots.iterator(); it.hasNext() && got < qty; ) {
+            Lot l = it.next();
+            if (!l.name.equalsIgnoreCase(name)) continue;
+            int take = Math.min(l.qty, qty - got);
+            total += take * l.cost;
+            got += take;
+            l.qty -= take;
+            if (l.qty <= 0) it.remove();
+        }
+        return new double[]{total, got};
+    }
+
+    /** Cost of crafting qty of an item from your bought lots: {cost, how many bought ingredients were used}. */
+    private static double[] craftCost(String name, int qty, int depth) {
+        String id = Prices.idFor(name);
+        var recipe = id == null ? null : CraftCost.recipes().get(id);
+        if (recipe == null || depth <= 0) return new double[]{0, 0};
+        int makes = Math.max(1, recipe.getValue());
+        int crafts = (qty + makes - 1) / makes;
+        double cost = 0, used = 0;
+        for (var ing : recipe.getKey().entrySet()) {
+            String ingName = Prices.nameOf(ing.getKey().replace('-', ':'));
+            int need = ing.getValue() * crafts;
+            double[] lots = takeLots(ingName, need);
+            cost += lots[0];
+            used += lots[1];
+            int missing = need - (int) lots[1];
+            if (missing > 0) {
+                double[] deeper = craftCost(ingName, missing, depth - 1);          // ingredient crafted from bought items too
+                if (deeper[1] > 0) { cost += deeper[0]; used += deeper[1]; }
+                else {                                                            // not bought at all: today's price (once)
+                    double[] bz = Prices.bazaarRaw(ing.getKey());
+                    cost += missing * (bz != null && bz[1] > 0 ? bz[1] : Prices.price(ingName));
+                }
+            }
+        }
+        return new double[]{cost * qty / (double) (crafts * makes), used};
     }
 
     /** Takes qty items out of your bought lots (oldest first) and returns their average cost. */

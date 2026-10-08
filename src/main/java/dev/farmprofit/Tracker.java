@@ -337,6 +337,7 @@ public final class Tracker {
         Perf.run("Waypoints", () -> Waypoints.tick(mc));
         Perf.run("Greenhouse unlocks", () -> Greenhouse.noticeInventory(mc));
         Perf.run("Quiz data", () -> WorldPuzzles.quizTick());
+        Perf.run("Mining events", MiningEvents::tick);
         Calc.tick(mc);
 
         if (now - lastScoreboardCheck > 500) {
@@ -345,7 +346,10 @@ public final class Tracker {
             finishCostCheck(now);
         }
 
-        if (Compat.screen(mc) != null && !(Compat.screen(mc) instanceof net.minecraft.client.gui.screens.ChatScreen)) lastMenuTime = System.currentTimeMillis();
+        if (Compat.screen(mc) != null && !(Compat.screen(mc) instanceof net.minecraft.client.gui.screens.ChatScreen)) {
+            lastMenuTime = System.currentTimeMillis();
+            if (!Menus.countsIn(mc)) Attribution.menuAt = lastMenuTime;   // loot menus (visitors, dungeon chests) don't count as "crafting/buying"
+        }
         Map<String, Integer> inv = scanInventory(mc);   // (measured as part of "Inventory tracking")
         Session target = mostRecent();
         boolean inMenu = Compat.screen(mc) != null;
@@ -366,7 +370,8 @@ public final class Tracker {
             // Something gained in the same tick (compactor, crafting): treat as a conversion, keep it net.
             // Only losses: you used it up (potion, arrows, a visitor's request) -> "Spent".
             for (var d : deltas.entrySet()) {
-                if (d.getValue() > 0 && !anyLoss(deltas) && !Attribution.counts(target, d.getKey(), Config.get().attributionSeconds * 1000L)) continue;  // not from this activity
+                boolean lootMenu = inMenu && menuOk;          // visitor rewards, dungeon / Croesus chests: real loot
+                if (d.getValue() > 0 && !lootMenu && !anyLoss(deltas) && !Attribution.counts(target, d.getKey(), Config.get().attributionSeconds * 1000L)) continue;  // not from this activity
                 if (anyGain || d.getValue() > 0) target.addItem(d.getKey(), d.getValue());
                 // the crops / ores themselves (and their enchanted forms) leaving the inventory are moved, crafted
                 // or put in sacks, not used up: keep them as a negative amount instead of "Spent"

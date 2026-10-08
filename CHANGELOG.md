@@ -1,5 +1,14 @@
 # Changelog
 
+## 8.6.0
+- Craft flips counted in flip profit; instant buy / sell messages tracked.
+
+## 8.5.3
+- Crafted/bought items after menus and other-activity items no longer counted.
+
+## 8.5.2
+- Mining events from the shared Soopy service (anywhere), tab list as backup.
+
 ## 8.5.1
 - Boss timers (tab-list based, remembered) with toggles + custom tab lines.
 

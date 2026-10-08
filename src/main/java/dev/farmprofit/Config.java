@@ -313,8 +313,10 @@ public final class Config {
     public boolean timersPanel = true;
     @Setting(category = "Timers", label = "Dark Auction", desc = "Every hour at :55.")
     public boolean timerDarkAuction = true;
-    @Setting(category = "Timers", label = "Dwarven Mines event", desc = "The current Mining event (2x Powder, Goblin Raid, Gone with the Wind...) from your tab list / sidebar.")
+    @Setting(category = "Timers", label = "Mining events", desc = "Current Dwarven Mines and Crystal Hollows events with time left, from anywhere (shared service), or your tab list as a backup.")
     public boolean timerMiningEvent = true;
+    @Setting(category = "Timers", label = "Mining events source", desc = "Shared mining-event service (Soopy's, also used by SkyHanni's Mining Event Tracker): shows Dwarven Mines / Crystal Hollows events from anywhere. Empty = only your own tab list.")
+    public String miningEventsUrl = "https://api.soopy.dev/skyblock/chevents/get";
     @Setting(category = "Timers", label = "Cult of the Fallen Star", desc = "Days 7, 14, 21 and 28 of every SkyBlock month, 00:00-06:00.")
     public boolean timerCult = true;
     @Setting(category = "Timers", label = "Spooky Festival", desc = "Autumn 29-31.")
