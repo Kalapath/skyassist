@@ -11,7 +11,13 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class GlowColorMixin {
     @Inject(method = "getTeamColor", at = @At("HEAD"), cancellable = true, require = 0)
     private void skyassist$pestColor(CallbackInfoReturnable<Integer> cir) {
-        Entity self = (Entity) (Object) this;
-        if (dev.farmprofit.Glow.isHighlighted(self)) cir.setReturnValue(dev.farmprofit.Glow.color(self));
+        // an error in here would crash the frame, so it is caught and reported instead (/skyassist status)
+        try {
+            if (dev.farmprofit.Safe.paused("Glow outline color")) return;
+            Entity self = (Entity) (Object) this;
+            if (dev.farmprofit.Glow.isHighlighted(self)) cir.setReturnValue(dev.farmprofit.Glow.color(self));
+        } catch (Throwable t) {
+            dev.farmprofit.Safe.report("Glow outline color", t);
+        }
     }
 }

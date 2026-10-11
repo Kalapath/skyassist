@@ -6,10 +6,11 @@
   "description": "Display-only Hypixel SkyBlock helper: profit tracking for every activity, Bazaar flipping, price and craft-cost tooltips, talisman planner, dungeon secret finder and puzzle solvers.",
   "authors": ["Kalapath"],
   "contact": {
-    "sources": "https://github.com/Kalapath/farmprofit",
-    "issues": "https://github.com/Kalapath/farmprofit/issues"
+    "sources": "https://github.com/Kalapath/skyassist",
+    "issues": "https://github.com/Kalapath/skyassist/issues"
   },
   "license": "MIT",
+  "icon": "assets/skyassist/icon.png",
   "environment": "client",
   "mixins": [
     "skyassist.mixins.json"

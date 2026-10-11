@@ -67,7 +67,7 @@ public final class Panels {
     public static void save() {
         try {
             Files.createDirectories(Config.DIR);
-            Files.writeString(FILE, Config.GSON.toJson(map));
+            Config.write(FILE, Config.GSON.toJson(map));
         } catch (Exception e) {
             FarmProfitClient.LOG.warn("Could not save panels", e);
         }

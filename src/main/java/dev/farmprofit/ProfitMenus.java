@@ -44,11 +44,16 @@ public final class ProfitMenus {
         rows.add(entry("§fHOTF guide", "Best Heart of the Forest trees for Fig / Helix whispers.", () -> Compat.setScreen(mc(), TreeGuideScreen.hotf(ref.screen))));
         rows.add(entry("§fAttribute shards", "Cheapest attribute levels to buy next.", () -> Compat.setScreen(mc(), Shards.screen(ref.screen))));
         rows.add(entry("§fMarket signals", "Mayor / event / trend signals from price history, with backtest.", () -> Compat.setScreen(mc(), MarketSignals.screen(ref.screen))));
+        rows.add(entry("§fPrice alerts", "Bazaar items you watch: pings when they cross your price.", () -> Compat.setScreen(mc(), PriceAlerts.screen(ref.screen))));
         rows.add(entry("§fNext talismans", "Cheapest Magical Power you don't have yet.", () -> Compat.setScreen(mc(), TalismansScreen.screen(ref.screen))));
         rows.add(entry("§fSettings", "Every setting, with search.", () -> Compat.setScreen(mc(), new SettingsScreen(ref.screen))));
         rows.add(entry("§fCommands", "Every command with a short explanation.", () -> Compat.setScreen(mc(), Commands.screen(ref.screen))));
         rows.add(entry("§fHUD editor", "Move, resize and hide the HUD panels.", () -> { Compat.setScreen(mc(), null); GuiEditor.open(); }));
-        rows.add(entry("§fSetup check", "What the mod can see, and what to turn on.", () -> Compat.setScreen(mc(), new SetupScreen())));
+        rows.add(entry("§fSetup check", "What the mod can see, and what to turn on.", () -> Compat.setScreen(mc(), new SetupScreen(ref.screen))));
+        int trouble = Health.failedCount() + Safe.faultCount();
+        rows.add(entry("§fStatus" + (trouble > 0 ? " §c(" + trouble + ")" : ""), trouble > 0 ? "§cSomething isn't loading or hit a problem: see why, and retry."
+                : "Is everything loading? Data sources, problems, checks; copy a report.", () -> Compat.setScreen(mc(), Status.screen(ref.screen))));
+        rows.add(entry("§fWhat's new", "What changed in the latest versions.", () -> Compat.setScreen(mc(), News.screen(ref.screen))));
         Tab t = new Tab("Menu", () -> new Page(new String[]{"What", "", ""}, new int[]{150, 260, 40}, rows, List.of(),
                 List.of("§8Open this menu with the P key (change it in Controls) or /profit menu.")));
         ref.screen = new MenuScreen("SkyAssist", List.of(t), 0, null);

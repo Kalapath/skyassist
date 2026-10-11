@@ -17,7 +17,7 @@ public final class Playstyle {
                 "solveWeirdos", "solveBlaze", "solveTerminals", "solveIceFill", "solveCreeper", "solveTeleport", "solveTicTacToe", "solveQuiz", "solveMelody"));
         GROUPS.put("Kuudra", List.of("showKuudraHud"));
         GROUPS.put("Diana", List.of("showDianaHud", "dianaHelper", "glowInquisitor"));
-        GROUPS.put("Bazaar", List.of("bazaarHud"));
+        GROUPS.put("Bazaar", List.of("bazaarHud", "auctionHud"));
     }
 
     /** On if the activity's main switch (first in its list) is on. */

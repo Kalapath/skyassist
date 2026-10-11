@@ -12,7 +12,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class SwimMixin {
     @Inject(method = "updateSwimming", at = @At("TAIL"), require = 0)
     private void skyassist$noSwim(CallbackInfo ci) {
-        Entity self = (Entity) (Object) this;
-        if (dev.farmprofit.Config.get().disableSwimming && self == Minecraft.getInstance().player) self.setSwimming(false);
+        try {
+            Entity self = (Entity) (Object) this;
+            if (dev.farmprofit.Config.get().disableSwimming && self == Minecraft.getInstance().player) self.setSwimming(false);
+        } catch (Throwable t) {
+            dev.farmprofit.Safe.report("Disable swimming", t);
+        }
     }
 }

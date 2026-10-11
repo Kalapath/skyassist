@@ -35,6 +35,13 @@ public final class MenuScreen extends Screen {
     private boolean dirty = true;
     private boolean searchable;
 
+    private java.util.function.BooleanSupplier liveWhile;
+    private boolean wasLive;
+    private int liveTicks;
+
+    /** Rebuilds the page every second while this is true (and once more when it turns false), e.g. while data loads. */
+    public MenuScreen liveWhile(java.util.function.BooleanSupplier s) { this.liveWhile = s; return this; }
+
     /** Adds a search box at the top right that filters the rows. */
     public MenuScreen searchable() { this.searchable = true; return this; }
 
@@ -87,10 +94,33 @@ public final class MenuScreen extends Screen {
         this.tab = Math.max(0, Math.min(startTab, tabs.size() - 1));
     }
 
+    /** Set when building a page failed: the screen then shows this message instead (and the problem is in /skyassist status). */
+    private String broken;
+
     @Override
     protected void init() {
+        try {
+            build();
+        } catch (Throwable t) {
+            Safe.report("Menu: " + heading, t);
+            if (broken == null) {
+                broken = Safe.describe(t);
+                ((java.util.concurrent.Executor) Minecraft.getInstance()).execute(() -> rebuildWidgets());    // start over with the error page
+            }
+        }
+    }
+
+    private void build() {
         int left = Math.max(10, width / 2 - 230), right = Math.min(width - 10, width / 2 + 230);
         addRenderableWidget(new StringWidget(left, 8, right - left - (searchable ? 160 : 0), 10, Component.literal("§6§l" + heading), font));
+        if (broken != null) {
+            addRenderableWidget(new StringWidget(left, 30, right - left, 10, Component.literal("§cThis menu hit a problem and can't be shown."), font));
+            int by = 46;
+            for (String l : wrap("§7" + broken, right - left)) { addRenderableWidget(new StringWidget(left, by, Math.max(30, font.width(l) + 2), 10, Component.literal(l), font)); by += 11; }
+            addRenderableWidget(new StringWidget(left, by + 6, right - left, 10, Component.literal("§8Details: /skyassist status (Problems tab). The rest of the mod keeps working."), font));
+            closeButton(right);
+            return;
+        }
 
         // tabs
         int x = left, y = 22;
@@ -111,7 +141,10 @@ public final class MenuScreen extends Screen {
         if (cachedPage != null && cachedTab == tab && !dirty) p = cachedPage;        // scrolling / searching: reuse
         else {
             try { p = tabs.isEmpty() ? null : tabs.get(tab).page().get(); }
-            catch (Exception e) { p = new Page(new String[]{"§cCouldn't build this page: " + e.getMessage()}, new int[]{400}, List.of(), List.of(), List.of()); }
+            catch (Throwable e) {
+                Safe.report("Menu page: " + heading + " / " + tabs.get(tab).name(), e);
+                p = new Page(new String[]{"§cCouldn't build this page: " + Safe.describe(e)}, new int[]{440}, List.of(), List.of(), List.of("§8Details: /skyassist status (Problems tab)."));
+            }
             cachedPage = p;
             cachedTab = tab;
             dirty = false;
@@ -124,7 +157,7 @@ public final class MenuScreen extends Screen {
             for (Action a : p.top()) {
                 int w = font.width(a.label()) + 14;
                 if (x + w > right) { x = left; y += 20; }
-                Button b = Button.builder(Component.literal(a.label()), btn -> a.run().run()).bounds(x, y, w, 18).build();
+                Button b = Button.builder(Component.literal(a.label()), btn -> click(a)).bounds(x, y, w, 18).build();
                 if (a.tooltip() != null) b.setTooltip(Tooltip.create(Component.literal(a.tooltip())));
                 addRenderableWidget(b);
                 x += w + 3;
@@ -217,7 +250,7 @@ public final class MenuScreen extends Screen {
                         Action a = row.buttons().get(b);
                         int w = font.width(a.label()) + 12;
                         bx -= w;
-                        Button btn = Button.builder(Component.literal(a.label()), x2 -> a.run().run()).bounds(bx, ry + (h - 18) / 2 - 2, w, 18).build();
+                        Button btn = Button.builder(Component.literal(a.label()), x2 -> click(a)).bounds(bx, ry + (h - 18) / 2 - 2, w, 18).build();
                         if (a.tooltip() != null) btn.setTooltip(Tooltip.create(Component.literal(a.tooltip())));
                         addRenderableWidget(btn);
                         bx -= 3;
@@ -244,6 +277,16 @@ public final class MenuScreen extends Screen {
         closeButton(right);
     }
 
+    /** A button press: an error in what it does is reported (and shown in chat), not allowed to crash the game. */
+    private static void click(Action a) {
+        try {
+            a.run().run();
+        } catch (Throwable t) {
+            Safe.report("Menu button: " + Tracker.strip(a.label()), t);
+            Tracker.say("§6[SkyAssist] §c\"" + Tracker.strip(a.label()) + "\" hit a problem: §7" + Safe.describe(t) + " §8(/skyassist status)");
+        }
+    }
+
     private void closeButton(int right) {
         addRenderableWidget(Button.builder(Component.literal(parent != null ? "Back" : "Done"), b -> onClose())
                 .bounds(right - 60, height - 26, 60, 20).build());
@@ -266,7 +309,17 @@ public final class MenuScreen extends Screen {
         if (pending != null && Compat.noScreen(mc)) {
             Supplier<Screen> s = pending;
             pending = null;
-            Compat.setScreen(mc, s.get());
+            try {
+                Compat.setScreen(mc, s.get());
+            } catch (Throwable t) {
+                Safe.report("Opening a menu", t);
+                Tracker.say("§6[SkyAssist] §cCouldn't open that menu: §7" + Safe.describe(t) + " §8(/skyassist status)");
+            }
+        }
+        if (Compat.screen(mc) instanceof MenuScreen m && m.liveWhile != null) {
+            boolean live = Safe.test("Menu auto-refresh", m.liveWhile::getAsBoolean, false);
+            if ((live && ++m.liveTicks % 20 == 0) || (!live && m.wasLive)) m.refresh();
+            m.wasLive = live;
         }
     }
 

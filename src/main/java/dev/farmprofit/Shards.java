@@ -237,7 +237,7 @@ public final class Shards {
     private static String lastReported = "";
 
     private static void save() {
-        try { Files.createDirectories(Config.DIR); Files.writeString(FILE, Config.GSON.toJson(levels)); } catch (Exception ignored) {}
+        try { Files.createDirectories(Config.DIR); Config.write(FILE, Config.GSON.toJson(levels)); } catch (Exception ignored) {}
     }
 
     /** Forget all hand-set values (go back to reading the menus). */

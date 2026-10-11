@@ -12,11 +12,6 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -356,7 +351,11 @@ public final class WorldPuzzles {
     // Quiz (Ouro the Omniscient): known answers from a maintained list.
     // =====================================================================
 
-    private static final Map<String, List<String>> QUIZ = new HashMap<>();
+    private static final String QUIZ_NAME = "Quiz answers";
+    /** Replaced as a whole when new data arrives (the download runs on another thread). */
+    private static volatile Map<String, List<String>> QUIZ = Map.of();
+
+    static { Health.onRetry(QUIZ_NAME, () -> quizFetch = 0); }
     private static final Pattern OPTION = Pattern.compile("^\\s*([ⓐⓑⓒ])\\s*(.+)$");
     private static volatile long quizFetch;
     private static List<String> currentAnswers;
@@ -364,29 +363,29 @@ public final class WorldPuzzles {
     private static long quizTime;
 
     public static void quizTick() {
-        String url = Config.get().quizDataUrl;
-        if (!Config.get().solveQuiz || url == null || url.isBlank()) return;
+        Config c = Config.get();
+        if (!c.solveQuiz) { Health.off(QUIZ_NAME, "the quiz solver is turned off"); return; }
+        String url = c.quizDataUrl;
+        if (url == null || url.isBlank()) { Health.off(QUIZ_NAME, "no data address in the settings"); return; }
         long now = System.currentTimeMillis();
-        if (now - quizFetch < (QUIZ.isEmpty() ? 10 * 60_000 : 12 * 3_600_000L)) return;
+        long wait = QUIZ.isEmpty() ? Health.delay(QUIZ_NAME, 10 * 60_000L, 10 * 60_000L) : Health.delay(QUIZ_NAME, 12 * 3_600_000L, 30 * 60_000L);
+        if (now - quizFetch < wait) return;
         quizFetch = now;
-        HttpClient.newHttpClient().sendAsync(HttpRequest.newBuilder(URI.create(url)).header("User-Agent", "SkyAssist")
-                        .timeout(Duration.ofSeconds(20)).GET().build(), HttpResponse.BodyHandlers.ofString())
-                .thenAccept(r -> {
-                    if (r.statusCode() != 200) return;
-                    try {
-                        JsonObject o = JsonParser.parseString(r.body()).getAsJsonObject();
-                        Map<String, List<String>> found = new HashMap<>();
-                        for (var e : o.entrySet()) {
-                            List<String> answers = new ArrayList<>();
-                            if (e.getValue().isJsonArray()) for (JsonElement a : e.getValue().getAsJsonArray()) answers.add(a.getAsString());
-                            else answers.add(e.getValue().getAsString());
-                            found.put(norm(e.getKey()), answers);
-                        }
-                        QUIZ.clear();
-                        QUIZ.putAll(found);
-                    } catch (Exception ignored) {}
-                })
-                .exceptionally(e -> null);
+        Http.get(QUIZ_NAME, url, 20, body -> {
+            JsonObject o = JsonParser.parseString(body).getAsJsonObject();
+            Map<String, List<String>> found = new HashMap<>();
+            for (var e : o.entrySet()) {
+                try {
+                    List<String> answers = new ArrayList<>();
+                    if (e.getValue().isJsonArray()) for (JsonElement a : e.getValue().getAsJsonArray()) answers.add(a.getAsString());
+                    else answers.add(e.getValue().getAsString());
+                    found.put(norm(e.getKey()), answers);
+                } catch (Exception skipThisOne) { /* one odd entry shouldn't lose the rest */ }
+            }
+            if (found.isEmpty()) throw new IllegalStateException("no questions found in the file");
+            QUIZ = found;
+            return Health.count(found.size(), "questions");
+        });
     }
 
     public static int quizCount() { return QUIZ.size(); }

@@ -52,7 +52,7 @@ public final class Storage {
         }
         Map<String, Integer> old = data().put(title, contents);
         if (!contents.equals(old)) {
-            try { Files.createDirectories(Config.DIR); Files.writeString(FILE, Config.GSON.toJson(data)); } catch (Exception ignored) {}
+            try { Files.createDirectories(Config.DIR); Config.write(FILE, Config.GSON.toJson(data)); } catch (Exception ignored) {}
         }
     }
 

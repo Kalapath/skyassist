@@ -15,6 +15,12 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class ParticlePacketMixin {
     @Inject(method = "handleParticleEvent", at = @At("TAIL"), require = 0)
     private void skyassist$onParticles(ClientboundLevelParticlesPacket packet, CallbackInfo ci) {
-        dev.farmprofit.Lockpick.onPacket(packet);
+        // an error while handling a packet would disconnect you from the server, so it is caught and reported instead
+        try {
+            if (dev.farmprofit.Safe.paused("Particle hook")) return;
+            dev.farmprofit.Lockpick.onPacket(packet);
+        } catch (Throwable t) {
+            dev.farmprofit.Safe.report("Particle hook", t);
+        }
     }
 }

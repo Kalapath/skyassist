@@ -16,7 +16,7 @@ public final class Profiles {
     public static void save(String name) {
         try {
             Files.createDirectories(DIR);
-            Files.writeString(file(name), Config.GSON.toJson(Config.get()));
+            Config.write(file(name), Config.GSON.toJson(Config.get()));
             Tracker.say("§6[SkyAssist] §7Saved settings profile §f" + name);
         } catch (Exception e) { Tracker.say("§6[SkyAssist] §cCouldn't save: " + e.getMessage()); }
     }

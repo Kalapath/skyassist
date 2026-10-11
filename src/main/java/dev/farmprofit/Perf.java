@@ -9,10 +9,11 @@ public final class Perf {
     private static final Map<String, long[]> TIMES = new ConcurrentHashMap<>();   // name -> {total ns, calls}
     private static long since = System.nanoTime();
 
-    /** Runs a feature and records its time. Errors in one feature never stop the others. */
+    /** Runs a feature and records its time. Errors in one feature never stop the others (they show up in /skyassist status). */
     public static void run(String name, Runnable r) {
+        if (Safe.paused(name)) return;
         long t = System.nanoTime();
-        try { r.run(); } catch (Throwable e) { FarmProfitClient.LOG.debug("{} failed", name, e); }
+        try { r.run(); } catch (Throwable e) { Safe.report(name, e); }
         long[] a = TIMES.computeIfAbsent(name, k -> new long[2]);
         a[0] += System.nanoTime() - t;
         a[1]++;

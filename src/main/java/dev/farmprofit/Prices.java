@@ -3,11 +3,6 @@ package dev.farmprofit;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -26,30 +21,50 @@ public final class Prices {
     public static volatile boolean bazaarUpdated;
     private static volatile long lastBazaarFetch;
     private static final long REFRESH_MS = 10 * 60 * 1000;
-    private static final HttpClient HTTP = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(10)).followRedirects(HttpClient.Redirect.NORMAL).build();
     private static final Map<String, double[]> BAZAAR = new ConcurrentHashMap<>(); // {instasell, sellorder}
     private static final Map<String, Double> BINS = new ConcurrentHashMap<>();
-    private static volatile long lastFetch;
+    private static volatile long lastFetch, lastBinTry;
+    private static volatile boolean binsLoading;
+    private static volatile int retryStreak;
+
+    static {
+        Health.onRetry("Bazaar prices", () -> { retryStreak = 0; refresh(); });
+        Health.onRetry("Item list", () -> fetchItems());
+        Health.onRetry("Lowest BIN", () -> loadBins(0));
+        Health.onRetry("BIN averages", () -> fetchAverages());
+    }
 
     public static void tick() {
         long now = System.currentTimeMillis();
-        if (now - lastFetch > REFRESH_MS) refresh();
-        // refresh the bazaar much more often while you have orders out
-        else if (Bazaar.hasOpenOrders() && now - lastBazaarFetch > Config.get().bzRefreshSeconds * 1000L) {
-            lastBazaarFetch = now;
-            fetch(BAZAAR_URL, Prices::parseBazaar);
+        // until the first load has worked, try again soon (30 s, 1 min, 2 min ... up to the normal 10 min)
+        long wait = BAZAAR.isEmpty() ? Math.min(REFRESH_MS, 30_000L << Math.min(5, retryStreak)) : REFRESH_MS;
+        if (now - lastFetch > wait) {
+            if (BAZAAR.isEmpty()) retryStreak++;
+            refresh();
         }
+        // refresh the bazaar much more often while you have orders out or price alerts waiting
+        else if ((Bazaar.hasOpenOrders() || PriceAlerts.watching()) && now - lastBazaarFetch > Config.get().bzRefreshSeconds * 1000L) {
+            lastBazaarFetch = now;
+            fetchBazaar();
+        }
+        // Bazaar is fine but no auction prices came through: try those again every two minutes
+        else if (!BAZAAR.isEmpty() && BINS.size() < 100 && !binsLoading && now - lastBinTry > 120_000) loadBins(0);
     }
 
     public static void refresh() {
         lastFetch = System.currentTimeMillis();
         lastBazaarFetch = lastFetch;
-        fetch(BAZAAR_URL, Prices::parseBazaar);
-        if (!itemsLoaded) fetch(ITEMS_URL, Prices::parseItems);
+        fetchBazaar();
+        if (!itemsLoaded) fetchItems();
         loadBins(0);
-        fetch("https://lb.tricked.dev/averages/1day.json", Prices::parseAverages);
+        fetchAverages();
     }
+
+    private static void fetchBazaar() { Http.get("Bazaar prices", BAZAAR_URL, 30, Prices::parseBazaar); }
+
+    private static void fetchItems() { Http.get("Item list", ITEMS_URL, 60, Prices::parseItems); }
+
+    private static void fetchAverages() { Http.get("BIN averages", "https://lb.tricked.dev/averages/1day.json", 30, Prices::parseAverages); }
 
     /** Lowest-BIN sources, tried in order until one answers (moulberry.codes alone left AH prices empty when it was down). */
     private static java.util.List<String> binSources() {
@@ -65,65 +80,66 @@ public final class Prices {
 
     private static void loadBins(int i) {
         java.util.List<String> src = binSources();
-        if (i >= src.size()) { binSource = "all sources failed"; return; }
+        if (i == 0) { if (binsLoading && System.currentTimeMillis() - lastBinTry < 60_000) return; binsLoading = true; }
+        lastBinTry = System.currentTimeMillis();
+        if (i >= src.size()) {
+            binSource = "all sources failed";
+            binsLoading = false;
+            Health.fail("Lowest BIN", "all " + src.size() + " sources failed (see the log for each reason)");
+            return;
+        }
         String url = src.get(i);
-        HTTP.sendAsync(HttpRequest.newBuilder(URI.create(url)).header("User-Agent", "SkyAssist").timeout(Duration.ofSeconds(30)).GET().build(),
-                        HttpResponse.BodyHandlers.ofString())
-                .thenAccept(res -> {
-                    int before = BINS.size();
-                    if (res.statusCode() == 200) { try { parseBins(res.body()); } catch (Exception ignored) {} }
-                    if (res.statusCode() == 200 && BINS.size() > 100) binSource = url;
-                    else if (BINS.size() <= Math.max(100, before)) loadBins(i + 1);                  // try the next one
-                })
-                .exceptionally(err -> { loadBins(i + 1); return null; });
+        Http.get("Lowest BIN", url, 30, java.util.Map.of(), body -> {
+            int n = parseBins(body);
+            if (n < 100) throw new IllegalStateException("only " + n + " prices - this source looks wrong");
+            binSource = url;
+            binsLoading = false;
+            return Health.count(BINS.size(), "auction prices") + " from " + url.replaceFirst("^https?://", "").replaceFirst("/.*$", "");
+        }, () -> loadBins(i + 1));                                    // anything wrong: try the next source
     }
 
     /** Average lowest BIN over the last day (for spotting inflated prices). */
     private static final Map<String, Double> BIN_AVG = new ConcurrentHashMap<>();
 
-    private static void parseAverages(String body) {
-        try {
-            JsonObject root = JsonParser.parseString(body).getAsJsonObject();
-            for (var e : root.entrySet()) {
-                try {
-                    var v = e.getValue();
-                    double d = v.isJsonPrimitive() ? v.getAsDouble()
-                            : v.getAsJsonObject().has("price") ? v.getAsJsonObject().get("price").getAsDouble()
-                            : v.getAsJsonObject().has("clean_price") ? v.getAsJsonObject().get("clean_price").getAsDouble() : 0;
-                    if (d > 0) BIN_AVG.put(e.getKey(), d);
-                } catch (Exception ignored) {}
-            }
-        } catch (Exception ignored) {}
+    private static String parseAverages(String body) {
+        JsonObject root = JsonParser.parseString(body).getAsJsonObject();
+        int n = 0;
+        for (var e : root.entrySet()) {
+            try {
+                var v = e.getValue();
+                double d = v.isJsonPrimitive() ? v.getAsDouble()
+                        : v.getAsJsonObject().has("price") ? v.getAsJsonObject().get("price").getAsDouble()
+                        : v.getAsJsonObject().has("clean_price") ? v.getAsJsonObject().get("clean_price").getAsDouble() : 0;
+                if (d > 0) { BIN_AVG.put(e.getKey(), d); n++; }
+            } catch (Exception ignored) {}
+        }
+        if (n == 0) throw new IllegalStateException("no prices in the file");
+        return Health.count(n, "daily averages");
     }
 
     /** Average lowest BIN over a day, or 0 if unknown. */
     public static double binAverage(String id) { return BIN_AVG.getOrDefault(id, 0.0); }
 
-    private static void fetch(String url, java.util.function.Consumer<String> parser) {
-        HttpRequest req = HttpRequest.newBuilder(URI.create(url))
-                .header("User-Agent", "SkyAssist")
-                .timeout(Duration.ofSeconds(30)).GET().build();
-        HTTP.sendAsync(req, HttpResponse.BodyHandlers.ofString())
-                .thenAccept(res -> {
-                    if (res.statusCode() == 200) parser.accept(res.body());
-                    else FarmProfitClient.LOG.warn("Price fetch {} returned {}", url, res.statusCode());
-                })
-                .exceptionally(err -> { FarmProfitClient.LOG.warn("Price fetch failed: {}", url, err); return null; });
-    }
-
-    private static void parseBazaar(String body) {
+    private static String parseBazaar(String body) {
         JsonObject root = JsonParser.parseString(body).getAsJsonObject();
-        if (!root.has("success") || !root.get("success").getAsBoolean()) return;
+        if (!root.has("success") || !root.get("success").getAsBoolean()) throw new IllegalStateException("the API said success=false");
+        int n = 0;
         for (var e : root.getAsJsonObject("products").entrySet()) {
-            JsonObject qs = e.getValue().getAsJsonObject().getAsJsonObject("quick_status");
-            if (qs == null) continue;
-            BAZAAR.put(e.getKey(), new double[]{qs.get("sellPrice").getAsDouble(), qs.get("buyPrice").getAsDouble()});
-            JsonObject p = e.getValue().getAsJsonObject();
-            double topBuy = top(p, "sell_summary"), lowSell = top(p, "buy_summary");   // Hypixel's naming is swapped
-            BOOK.put(e.getKey(), new double[]{topBuy, lowSell, num(qs, "sellMovingWeek"), num(qs, "buyMovingWeek"),
-                    num(qs, "buyOrders"), num(qs, "sellOrders")});
+            try {                                                     // one odd product must not drop the rest
+                JsonObject p = e.getValue().getAsJsonObject();
+                JsonObject qs = p.getAsJsonObject("quick_status");
+                if (qs == null) continue;
+                BAZAAR.put(e.getKey(), new double[]{qs.get("sellPrice").getAsDouble(), qs.get("buyPrice").getAsDouble()});
+                double topBuy = top(p, "sell_summary"), lowSell = top(p, "buy_summary");   // Hypixel's naming is swapped
+                BOOK.put(e.getKey(), new double[]{topBuy, lowSell, num(qs, "sellMovingWeek"), num(qs, "buyMovingWeek"),
+                        num(qs, "buyOrders"), num(qs, "sellOrders")});
+                n++;
+            } catch (Exception ignored) {}
         }
+        if (n == 0) throw new IllegalStateException("no products in the answer");
+        retryStreak = 0;
         bazaarUpdated = true;
+        return Health.count(n, "products");
     }
 
     private static double top(JsonObject product, String key) {
@@ -167,9 +183,9 @@ public final class Prices {
         return n >= 0 && n < r.length ? r[n] : String.valueOf(n);
     }
 
-    private static void parseItems(String body) {
+    private static String parseItems(String body) {
         JsonObject root = JsonParser.parseString(body).getAsJsonObject();
-        if (!root.has("items")) return;
+        if (!root.has("items")) throw new IllegalStateException("no item list in the answer");
         for (var el : root.getAsJsonArray("items")) {
             JsonObject it = el.getAsJsonObject();
             if (!it.has("id")) continue;
@@ -184,6 +200,7 @@ public final class Prices {
                 Shards.fromApi(id, Tracker.strip(it.get("name").getAsString()), it.has("tier") ? it.get("tier").getAsString() : "");
         }
         itemsLoaded = true;
+        return Health.count(NAME_IDS.size(), "items");
     }
 
     public static String idFor(String itemName) {
@@ -193,11 +210,13 @@ public final class Prices {
         return id != null ? id : Items.guessId(itemName);
     }
 
-    private static void parseBins(String body) {
+    private static int parseBins(String body) {
         JsonObject root = JsonParser.parseString(body).getAsJsonObject();
+        int n = 0;
         for (var e : root.entrySet()) {
-            try { BINS.put(e.getKey(), e.getValue().getAsDouble()); } catch (Exception ignored) {}
+            try { BINS.put(e.getKey(), e.getValue().getAsDouble()); n++; } catch (Exception ignored) {}
         }
+        return n;
     }
 
     public static boolean loaded() { return !BAZAAR.isEmpty(); }

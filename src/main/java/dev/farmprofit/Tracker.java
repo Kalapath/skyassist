@@ -291,22 +291,33 @@ public final class Tracker {
 
     // ---------- every tick ----------
 
+    /**
+     * Everything that runs once per game tick. Each part is guarded on its own (Safe / Perf.run): a problem in one feature
+     * skips that feature for that tick, is recorded for /skyassist status, and never stops the others or crashes the game.
+     */
     public static void tick(Minecraft mc) {
-        SettingsScreen.tick(mc);
-        TalismansScreen.tick(mc);
-        MenuScreen.tick(mc);
-        GuiEditor.tick(mc);
-        SetupScreen.tick(mc);
-        UpdateCheck.tick();
-        Prices.tick();
-        if (Prices.bazaarUpdated) {
-            Prices.bazaarUpdated = false;
-            Bazaar.onPrices();
-        }
+        Safe.run("Settings screen", () -> SettingsScreen.tick(mc));
+        Safe.run("Talismans screen", () -> TalismansScreen.tick(mc));
+        Safe.run("Menu screens", () -> MenuScreen.tick(mc));
+        Safe.run("HUD editor", () -> GuiEditor.tick(mc));
+        Safe.run("Setup screen", () -> SetupScreen.tick(mc));
+        Safe.run("Update check", UpdateCheck::tick);
+        Safe.run("What's new", () -> News.tick(mc));
+        Safe.run("Price loading", Prices::tick);
+        Safe.run("Data warnings", Health::announce);
+        Safe.run("Bazaar update", () -> {
+            if (Prices.bazaarUpdated) {
+                Prices.bazaarUpdated = false;
+                PriceAlerts.onPrices();            // (only sets a flag, so an error in the order tracker can't skip it)
+                Bazaar.onPrices();
+            }
+        });
         long now = System.currentTimeMillis();
-        for (Session s : new ArrayList<>(sessions.values())) {
-            if (idleMs(s) > resetMs()) endSession(s, true);
-        }
+        Safe.run("Session timeout", () -> {
+            for (Session s : new ArrayList<>(sessions.values())) {
+                if (idleMs(s) > resetMs()) endSession(s, true);
+            }
+        });
 
         if (mc.player == null || mc.level == null) {
             haveSnapshot = false; lastPlayer = null; pending.clear(); return;
@@ -315,11 +326,11 @@ public final class Tracker {
 
         if (now - lastTabCheck > 1000) {
             lastTabCheck = now;
-            readTab(mc);
+            Safe.run("Tab list", () -> readTab(mc));
         }
 
         Perf.run("Mining/foraging blocks", () -> trackBlocks(mc));
-        Combat.tick(mc);
+        Perf.run("Combat tracking", () -> Combat.tick(mc));
         Perf.run("Dungeon secret finder", () -> Secrets.tick(mc));
         Perf.run("Jacob's contests", () -> Contests.tick());
         Perf.run("Mayor", () -> Election.tick());
@@ -338,14 +349,24 @@ public final class Tracker {
         Perf.run("Greenhouse unlocks", () -> Greenhouse.noticeInventory(mc));
         Perf.run("Quiz data", () -> WorldPuzzles.quizTick());
         Perf.run("Mining events", MiningEvents::tick);
-        Calc.tick(mc);
+        Perf.run("Calculator", () -> Calc.tick(mc));
+        Perf.run("Price alerts", () -> PriceAlerts.tick(mc));
+        Perf.run("Big alerts", () -> Alerts.tick(mc));
+        Perf.run("Keep cursor", () -> CursorKeeper.tick(mc));
 
         if (now - lastScoreboardCheck > 500) {
             lastScoreboardCheck = now;
-            readPurse(mc);
-            finishCostCheck(now);
+            Safe.run("Sidebar", () -> {
+                readPurse(mc);
+                finishCostCheck(now);
+            });
         }
 
+        Perf.run("Inventory tracking", () -> trackInventory(mc));
+    }
+
+    /** What changed in your inventory since last tick, attributed to the activity you're doing (or "spent"). */
+    private static void trackInventory(Minecraft mc) {
         if (Compat.screen(mc) != null && !(Compat.screen(mc) instanceof net.minecraft.client.gui.screens.ChatScreen)) {
             lastMenuTime = System.currentTimeMillis();
             if (!Menus.countsIn(mc)) Attribution.menuAt = lastMenuTime;   // loot menus (visitors, dungeon chests) don't count as "crafting/buying"
@@ -653,6 +674,7 @@ public final class Tracker {
             return;
         }
         Mineshafts.onChat(plain);
+        if (Safe.test("Pickaxe ability", () -> AbilityAlert.onChat(plain), false)) return;
         if (Bazaar.handle(plain)) return;
         if (Auctions.onChat(plain)) return;
         if (Puzzles.onChat(plain)) return;
@@ -700,6 +722,7 @@ public final class Tracker {
         }
         if (SLAYER_DONE.matcher(plain).matches()) {
             long now = System.currentTimeMillis();
+            Safe.run("Slayer kill time", () -> SlayerTimes.onKill(slayerType));
             if (now - lastBossTime > 5000) activity(COMBAT).addBreak(slayerType);
             lastBossTime = now;
             return;

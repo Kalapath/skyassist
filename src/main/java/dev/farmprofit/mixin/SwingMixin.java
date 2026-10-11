@@ -12,7 +12,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class SwingMixin {
     @Inject(method = "getCurrentSwingDuration", at = @At("HEAD"), cancellable = true, require = 0)
     private void skyassist$slowSwing(CallbackInfoReturnable<Integer> cir) {
-        if (dev.farmprofit.Config.get().slowSwing && (Object) this == Minecraft.getInstance().player)
-            cir.setReturnValue(Math.max(2, dev.farmprofit.Config.get().swingDuration));
+        try {
+            if (dev.farmprofit.Config.get().slowSwing && (Object) this == Minecraft.getInstance().player)
+                cir.setReturnValue(Math.max(2, dev.farmprofit.Config.get().swingDuration));
+        } catch (Throwable t) {
+            dev.farmprofit.Safe.report("Slow swing", t);
+        }
     }
 }

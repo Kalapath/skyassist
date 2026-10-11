@@ -12,6 +12,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class GlowMixin {
     @Inject(method = "shouldEntityAppearGlowing", at = @At("HEAD"), cancellable = true, require = 0)
     private void skyassist$glowPests(Entity entity, CallbackInfoReturnable<Boolean> cir) {
-        if (dev.farmprofit.Glow.isHighlighted(entity)) cir.setReturnValue(true);
+        try {
+            if (dev.farmprofit.Safe.paused("Glow outline")) return;
+            if (dev.farmprofit.Glow.isHighlighted(entity)) cir.setReturnValue(true);
+        } catch (Throwable t) {
+            dev.farmprofit.Safe.report("Glow outline", t);
+        }
     }
 }

@@ -4,14 +4,10 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * Current Dwarven Mines / Crystal Hollows events from anywhere, like SkyHanni's Mining Event Tracker:
@@ -21,27 +17,28 @@ import java.util.Locale;
 public final class MiningEvents {
     public record Event(String island, String name, long endsAt) {}
 
+    private static final String NAME = "Mining events";
     private static volatile List<Event> events = List.of();
     private static volatile long fetchedAt, lastTry;
     public static volatile boolean ok;
 
+    static { Health.onRetry(NAME, () -> lastTry = 0); }
+
     public static void tick() {
         Config c = Config.get();
-        if (!c.timersPanel || !c.timerMiningEvent || c.miningEventsUrl == null || c.miningEventsUrl.isBlank()) return;
+        if (!c.timersPanel || !c.timerMiningEvent) { Health.off(NAME, "the Timers panel's mining event line is turned off"); return; }
+        if (c.miningEventsUrl == null || c.miningEventsUrl.isBlank()) { Health.off(NAME, "no data address in the settings"); return; }
         long now = System.currentTimeMillis();
-        if (now - lastTry < 60_000) return;                       // once a minute
+        if (now - lastTry < Health.delay(NAME, 60_000L, 60_000L)) return;      // once a minute (slower while it keeps failing)
         lastTry = now;
-        HttpClient.newHttpClient().sendAsync(HttpRequest.newBuilder(URI.create(c.miningEventsUrl))
-                        .header("User-Agent", "SkyAssist").timeout(Duration.ofSeconds(15)).GET().build(), HttpResponse.BodyHandlers.ofString())
-                .thenAccept(r -> {
-                    if (r.statusCode() != 200) { ok = false; return; }
-                    List<Event> found = new ArrayList<>();
-                    collect(JsonParser.parseString(r.body()), null, found);
-                    events = found;
-                    fetchedAt = System.currentTimeMillis();
-                    ok = true;
-                })
-                .exceptionally(e -> { ok = false; return null; });
+        Http.get(NAME, c.miningEventsUrl, 15, Map.of(), body -> {
+            List<Event> found = new ArrayList<>();
+            collect(JsonParser.parseString(body), null, found);
+            events = found;
+            fetchedAt = System.currentTimeMillis();
+            ok = true;
+            return found.isEmpty() ? "no events reported right now" : Health.count(found.size(), "events reported");
+        }, () -> ok = false);
     }
 
     /** Finds every {"event": ..., "ends_at": ...} entry, remembering which island list it was under. */

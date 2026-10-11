@@ -38,7 +38,8 @@ public final class Totals {
                 totals = Config.GSON.fromJson(Files.readString(FILE), new TypeToken<LinkedHashMap<String, Total>>() {}.getType());
             }
         } catch (Exception e) {
-            FarmProfitClient.LOG.warn("Could not read totals", e);
+            FarmProfitClient.LOG.warn("Could not read totals (the old file is kept as .broken)", e);
+            Config.backupBroken(FILE);
         }
         if (totals == null) {
             // first run: build totals from existing history
@@ -57,7 +58,7 @@ public final class Totals {
     private static void save() {
         try {
             Files.createDirectories(Config.DIR);
-            Files.writeString(FILE, Config.GSON.toJson(totals));
+            Config.write(FILE, Config.GSON.toJson(totals));
         } catch (Exception e) {
             FarmProfitClient.LOG.warn("Could not save totals", e);
         }

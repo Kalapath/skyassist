@@ -15,7 +15,14 @@ public final class SetupScreen extends Screen {
     private static boolean shownThisLaunch, openNextTick;
     private static long onSkyBlockSince;
 
-    public SetupScreen() { super(Component.literal("SkyAssist setup")); }
+    private final Screen parent;
+
+    public SetupScreen() { this(null); }
+
+    public SetupScreen(Screen parent) {
+        super(Component.literal("SkyAssist setup"));
+        this.parent = parent;
+    }
 
     private record Check(boolean ok, String text, String fix) {}
 
@@ -93,7 +100,7 @@ public final class SetupScreen extends Screen {
     public void onClose() {
         Config.get().setupDone = true;
         Config.save();
-        Compat.setScreen(Minecraft.getInstance(), null);
+        Compat.setScreen(Minecraft.getInstance(), parent);
     }
 
     public static void requestOpen() { openNextTick = true; }
