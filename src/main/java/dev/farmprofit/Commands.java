@@ -54,6 +54,9 @@ public final class Commands {
         add("HUD", "/profit icons", "Item icons on the HUD on or off.");
         add("HUD", "/profit scale <0.5-3>", "Size of the main HUD panel.");
         add("HUD", "/profit move <x> <y>", "Moves the main HUD panel to an exact spot.");
+        add("HUD", "Skill XP/h", "Automatic: a HUD line with your skill XP per hour and time to the next level (HUD settings).");
+        add("HUD", "Pickaxe ability", "Automatic: cooldown on the Mining HUD and a ready alert (Mining settings).");
+        add("HUD", "Slayer boss time", "Automatic: how long each slayer boss took, with best and average (Combat settings).");
         add("HUD", "Timers panel", "Dark Auction, Mining event, Cult, festivals, Jacob, and bosses (Broodmother, Endstone Protector, Dragon...): each on/off in Settings → Timers.");
         add("HUD", "/profit secrets", "Dungeon secret finder on or off.");
         add("HUD", "Crystal Hollows treasure chests", "Automatic: box + countdown on uncovered chests, chests/min, Double Powder, loot (Mining settings).");
@@ -64,6 +67,9 @@ public final class Commands {
         add("Bazaar", "/flips orders", "Your tracked orders and whether you're outbid / undercut (menu).");
         add("Bazaar", "/flips log", "Profit from your finished flips (menu).");
         add("Bazaar", "/market", "Market signals: what past mayor terms / events / trends did to prices, backtested (menu).");
+        add("Bazaar", "/alert <item> below|above <price> [buy|sell]", "Pings you when a Bazaar item crosses your price, e.g. /alert enchanted diamond below 1500 (buy = what you pay, sell = what you get).");
+        add("Bazaar", "/alerts", "Your price alerts with the current price; remove or re-arm them (menu).");
+        add("Bazaar", "/alert remove <number>", "Removes one price alert (/alert clear removes all of them).");
         add("Bazaar", "/flips craft", "Buy ingredients, craft, sell on the Bazaar for more (menu).");
         add("Bazaar", "/flips craftah", "Buy ingredients, craft, sell on the Auction House (armor, weapons...) (menu).");
         add("Bazaar", "/flips remove <number>", "Removes a stale order from the list.");
@@ -89,6 +95,8 @@ public final class Commands {
         add("Tools", "/hotm", "Best Heart of the Mountain trees: powder grinding, gemstones, mithril, glacite, starting out.");
         add("Tools", "/hotf", "Best Heart of the Forest trees: Fig (Forest Whispers), Helix (Desert Whispers), basics.");
         add("Tools", "/greenhouse", "Pick a mutation: what to unlock first, and a planting layout in the world (menu).");
+        add("Tools", "Inventory buttons", "Optional quick-command buttons beside your inventory; they run a command only when you click (Settings → Items → Inventory).");
+        add("Tools", "Upgrade value in tooltips", "Item tooltips show what enchants, potato books, recomb and gems are worth at Bazaar prices (a rough extra).");
         add("Tools", "Search box under any inventory", "Type to highlight matching items (name or description).");
         add("Tools", "/talismans chat", "The same list in chat.");
         add("Tools", "/calc <sum>", "Calculator: 64x8, 10m/3, (2.5k+500)*4. Copies the result.");
@@ -97,8 +105,11 @@ public final class Commands {
 
         add("Settings & help", "/profit setup", "First-time check: what the mod can see and what to turn on.");
         add("Settings & help", "/profit perf", "How much time each feature uses (to find FPS problems). /profit perf reset starts over.");
-        add("Settings & help", "/profit debug", "What's working (location, prices, overlays, recognised messages).");
-        add("Settings & help", "/profit report", "Copies a diagnostics report to paste when asking for help.");
+        add("Settings & help", "/skyassist status", "Is everything loading? Data sources with Retry, problems that were caught, checks (also /profit debug).");
+        add("Settings & help", "/skyassist status retry", "Tries every failing data source again right now.");
+        add("Settings & help", "/skyassist status chat", "The same checks as a short summary in chat (also /profit debug chat).");
+        add("Settings & help", "/skyassist news", "What changed in the latest versions (also shown once in chat after an update).");
+        add("Settings & help", "/profit report", "Copies a diagnostics report (versions, data sources, problems) to paste when asking for help.");
         add("Settings & help", "/profit dedupe", "Turns off features that SkyHanni / Skyblocker / Odin already do.");
         add("Settings & help", "/profit prices", "Downloads fresh prices now.");
         add("Settings & help", "/profit reload", "Reloads config.json after editing it by hand.");

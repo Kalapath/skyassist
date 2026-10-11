@@ -20,6 +20,8 @@ public final class Lockpick {
     /** Called from the mixin for every particle packet (on the game thread). */
     public static void onPacket(Object packet) {
         hooked = true;
+        // Hypixel sends a lot of particles: only look at them when a feature here can use them
+        if (!(Config.get().lockpickHelper && Tracker.MINING.equals(Tracker.area)) && !DianaBurrows.onDiana()) return;
         try {
             Object particle = Reflect.call(packet, new String[]{"getParticle", "particle"});
             Object type = Reflect.call(particle, "getType");
@@ -35,7 +37,9 @@ public final class Lockpick {
             if (!PowderChests.nearChest(x, y, z)) return;
             tx = x; ty = y + Config.get().lockpickOffset / 16.0; tz = z;            // a pixel or two above the particles
             seenAt = System.currentTimeMillis();
-        } catch (Throwable ignored) {}
+        } catch (Throwable t) {
+            Safe.report("Lockpick particles", t);
+        }
     }
 
     private static boolean active() { return System.currentTimeMillis() - seenAt < 1500; }

@@ -47,25 +47,54 @@ public final class MarketSignals {
     private static volatile String status = "not started (open /market)";
     private static volatile boolean running;
     private static volatile long builtAt;
+    private static volatile int tried, loaded;
+    private static volatile String lastError;
+    private static final String MAYORS = "Market: mayor history", PRICES = "Market: price history";
+
+    static {
+        Health.onRetry(MAYORS, MarketSignals::refresh);
+        Health.onRetry(PRICES, MarketSignals::refresh);
+    }
+
+    /** The reason for the Status page: our own messages as they are, network errors in plain words. */
+    private static String why(Throwable e) {
+        return e instanceof IllegalStateException && e.getMessage() != null ? e.getMessage() : Http.reason(e);
+    }
 
     // ---------------------------------------------------------------- data
 
     private static String get(String url) throws Exception {
-        HttpResponse<String> r = HTTP.send(HttpRequest.newBuilder(URI.create(url)).header("User-Agent", "SkyAssist")
-                .timeout(Duration.ofSeconds(30)).GET().build(), HttpResponse.BodyHandlers.ofString());
-        if (r.statusCode() != 200) throw new IllegalStateException("HTTP " + r.statusCode());
-        return r.body();
+        for (int attempt = 0; ; attempt++) {
+            HttpResponse<String> r = HTTP.send(HttpRequest.newBuilder(URI.create(url)).header("User-Agent", "SkyAssist")
+                    .timeout(Duration.ofSeconds(30)).GET().build(), HttpResponse.BodyHandlers.ofString());
+            if (r.statusCode() == 429 && attempt < 2) {                 // rate limited: wait as asked, then retry
+                long wait = r.headers().firstValue("Retry-After").map(v -> { try { return Long.parseLong(v.trim()); } catch (Exception e) { return 10L; } }).orElse(10L);
+                Thread.sleep(Math.min(60, Math.max(2, wait)) * 1000);
+                continue;
+            }
+            if (r.statusCode() != 200) throw new IllegalStateException("HTTP " + r.statusCode() + " from " + url.replaceAll("\\?.*", ""));
+            return r.body();
+        }
     }
 
-    /** Cached for a day so Coflnet isn't asked again and again. */
-    private static String cached(String key, String url) throws Exception {
+    /** Cached for a day so Coflnet isn't asked again and again. Only usable answers are kept (a broken one is asked for again). */
+    private static String cached(String key, String url, java.util.function.Predicate<String> usable) throws Exception {
         Path f = CACHE.resolve(key.replaceAll("[^A-Za-z0-9_.-]", "_") + ".json");
-        if (Files.exists(f) && System.currentTimeMillis() - Files.getLastModifiedTime(f).toMillis() < 24 * 3_600_000L) return Files.readString(f);
+        if (Files.exists(f) && System.currentTimeMillis() - Files.getLastModifiedTime(f).toMillis() < 24 * 3_600_000L) {
+            String saved = Files.readString(f);
+            if (isUsable(usable, saved)) return saved;
+        }
         String body = get(url);
-        Files.createDirectories(CACHE);
-        Files.writeString(f, body);
+        if (isUsable(usable, body)) {
+            Files.createDirectories(CACHE);
+            Files.writeString(f, body);
+        }
         Thread.sleep(1200);                                    // be gentle with the free API
         return body;
+    }
+
+    private static boolean isUsable(java.util.function.Predicate<String> usable, String body) {
+        try { return usable.test(body); } catch (Exception e) { return false; }
     }
 
     private static long time(JsonElement e) {
@@ -75,30 +104,61 @@ public final class MarketSignals {
         } catch (Exception ex) { return -1; }
     }
 
-    /** Price points from Coflnet's history: uses "buy" (or the average of buy/sell, or "price") and "timestamp". */
+    /** The list inside a response: the response itself, or its first array field ("data", "history", ...). */
+    private static com.google.gson.JsonArray arrayIn(JsonElement root) {
+        if (root.isJsonArray()) return root.getAsJsonArray();
+        if (root.isJsonObject()) for (var e : root.getAsJsonObject().entrySet()) if (e.getValue().isJsonArray()) return e.getValue().getAsJsonArray();
+        return new com.google.gson.JsonArray();
+    }
+
+    private static double num(JsonObject o, String... keys) {
+        for (String k : keys) {
+            if (!o.has(k) || o.get(k).isJsonNull()) continue;
+            try { double v = o.get(k).getAsDouble(); if (v > 0) return v; } catch (Exception ignored) {}
+        }
+        return -1;
+    }
+
+    /** Price points from a history response, whatever the field names (buy/sell, maxBuy/minSell, price, avg...). */
     private static List<Point> parseHistory(String body) {
         List<Point> out = new ArrayList<>();
-        JsonElement root = JsonParser.parseString(body);
-        if (!root.isJsonArray()) return out;
-        for (JsonElement el : root.getAsJsonArray()) {
+        for (JsonElement el : arrayIn(JsonParser.parseString(body))) {
             if (!el.isJsonObject()) continue;
             JsonObject o = el.getAsJsonObject();
-            long t = o.has("timestamp") ? time(o.get("timestamp")) : o.has("time") ? time(o.get("time")) : -1;
-            double p = o.has("buy") && o.has("sell") ? (o.get("buy").getAsDouble() + o.get("sell").getAsDouble()) / 2
-                    : o.has("buy") ? o.get("buy").getAsDouble() : o.has("price") ? o.get("price").getAsDouble() : -1;
+            long t = -1;
+            for (String k : new String[]{"timestamp", "time", "date", "t"}) if (t < 0 && o.has(k)) t = time(o.get(k));
+            double buy = num(o, "buy", "buyPrice", "maxBuy", "minBuy"), sell = num(o, "sell", "sellPrice", "minSell", "maxSell");
+            double p = buy > 0 && sell > 0 ? (buy + sell) / 2 : buy > 0 ? buy : sell > 0 ? sell : num(o, "price", "avg", "average", "median");
             if (t > 0 && p > 0) out.add(new Point(t, p));
         }
         out.sort(Comparator.comparingLong(Point::t));
         return out;
     }
 
+    /** Real-time start of the mayor term that began in SkyBlock year y (Late Spring 27). */
+    private static long termStart(long y) {
+        long epoch = 1560275700L * 1000, year = 446_400_000L, monthMs = 37_200_000L, dayMs = 1_200_000L;
+        return epoch + (y - 1) * year + 2 * monthMs + 26 * dayMs;
+    }
+
+    /** How the "year" in mayor data maps to the term start year: worked out from the current mayor when known. */
+    private static long yearOffset() {
+        if (Election.mayorYear > 0) {
+            long now = System.currentTimeMillis();
+            for (long off = -1; off <= 2; off++) {
+                long s = termStart(Election.mayorYear + off);
+                if (now >= s && now < s + 446_400_000L) return off;
+            }
+        }
+        return 1;      // an election held in year Y gives a mayor from Late Spring of Y+1
+    }
+
     /** Mayor terms from Coflnet's mayor history (tolerant: finds a name + a start date in each entry). */
     private static List<Term> parseMayors(String body) {
         List<long[]> starts = new ArrayList<>();
         List<String> names = new ArrayList<>();
-        JsonElement root = JsonParser.parseString(body);
-        if (!root.isJsonArray()) return List.of();
-        for (JsonElement el : root.getAsJsonArray()) {
+        long off = yearOffset();
+        for (JsonElement el : arrayIn(JsonParser.parseString(body))) {
             if (!el.isJsonObject()) continue;
             JsonObject o = el.getAsJsonObject();
             String name = null;
@@ -106,6 +166,7 @@ public final class MarketSignals {
             else if (o.has("name")) name = o.get("name").getAsString();
             long start = -1;
             for (String k : new String[]{"start", "startDate", "from", "timestamp", "date"}) if (start < 0 && o.has(k)) start = time(o.get(k));
+            if (start < 0 && o.has("year")) try { start = termStart(o.get("year").getAsLong() + off); } catch (Exception ignored) {}
             if (name != null && start > 0) { names.add(name); starts.add(new long[]{start}); }
         }
         List<Term> out = new ArrayList<>();
@@ -114,7 +175,11 @@ public final class MarketSignals {
             out.add(new Term(names.get(i), starts.get(i)[0], end));
         }
         out.sort(Comparator.comparingLong(Term::start));
-        return out;
+        // ends from the next term (the input order may differ from time order)
+        List<Term> fixed = new ArrayList<>();
+        for (int i = 0; i < out.size(); i++)
+            fixed.add(new Term(out.get(i).mayor(), out.get(i).start(), i + 1 < out.size() ? out.get(i + 1).start() : out.get(i).start() + 446_400_000L));
+        return fixed;
     }
 
     // ---------------------------------------------------------------- statistics
@@ -154,8 +219,15 @@ public final class MarketSignals {
         if (running) return;
         running = true;
         Thread t = new Thread(() -> {
-            try { build(); } catch (Exception e) { status = "§cfailed: " + e.getMessage(); }
-            running = false;
+            try {
+                build();
+            } catch (Throwable e) {
+                status = "§cfailed: " + why(e);
+                Health.fail(PRICES, why(e));
+                Safe.report("Market signals", e);
+            } finally {
+                running = false;
+            }
         }, "skyassist-market");
         t.setDaemon(true);
         t.start();
@@ -166,28 +238,80 @@ public final class MarketSignals {
         Instant now = Instant.now();
         Instant from = now.minus(Duration.ofDays(Math.max(30, c.marketHistoryDays)));
         status = "loading mayor history…";
+        lastError = null;
+        tried = 0;
+        loaded = 0;
+        String mayorUrl = "https://sky.coflnet.com/api/mayor?from=" + from.toString().substring(0, 10) + "&to=" + now.toString().substring(0, 10);
+        Health.attempt(MAYORS, mayorUrl);
         try {
-            terms = parseMayors(cached("mayors", "https://sky.coflnet.com/api/mayor?from=" + from.toString().substring(0, 10) + "&to=" + now.toString().substring(0, 10)));
-        } catch (Exception e) { terms = List.of(); }
+            terms = parseMayors(cached("mayors", mayorUrl, b -> !parseMayors(b).isEmpty()));
+            if (terms.isEmpty()) throw new IllegalStateException("no mayor terms found in the answer");
+            Health.ok(MAYORS, Health.count(terms.size(), "terms"));
+        } catch (Exception e) {
+            terms = List.of();
+            lastError = "mayor history: " + why(e);
+            Health.fail(MAYORS, why(e));
+        }
 
-        // the most traded Bazaar items (enough volume to mean something)
+        Health.attempt(PRICES, "https://sky.coflnet.com/api/bazaar/<item>/history");
+        for (int i = 0; i < 60 && Prices.BOOK.isEmpty(); i++) { status = "waiting for Bazaar prices…"; Thread.sleep(1000); }
+        if (Prices.BOOK.isEmpty()) {
+            status = "§cBazaar prices didn't load (see /skyassist status)";
+            Health.fail(PRICES, "waited a minute, but the Bazaar prices (needed to pick the items) didn't load");
+            return;
+        }
+
+        // the most traded Bazaar items (by coins traded per week)
         List<Map.Entry<String, double[]>> items = new ArrayList<>(Prices.BOOK.entrySet());
-        items.removeIf(e -> e.getValue()[1] <= 0 || Math.min(e.getValue()[2], e.getValue()[3]) < c.bzMinVolume);
+        items.removeIf(e -> e.getValue()[1] <= 0 || Math.min(e.getValue()[2], e.getValue()[3]) < 10_000);
         items.sort((a, b) -> Double.compare(Math.min(b.getValue()[2], b.getValue()[3]) * b.getValue()[1], Math.min(a.getValue()[2], a.getValue()[3]) * a.getValue()[1]));
         int n = Math.min(c.marketItems, items.size());
         for (int i = 0; i < n; i++) {
             String id = items.get(i).getKey();
             status = "loading price history " + (i + 1) + "/" + n + " (" + Prices.nameOf(id) + ")…";
-            try {
-                List<Point> pts = parseHistory(cached("h_" + id, "https://sky.coflnet.com/api/bazaar/" + id + "/history?start=" + from + "&end=" + now));
-                if (pts.size() > 20) synchronized (HISTORY) { HISTORY.put(id, pts); }
-            } catch (Exception ignored) {}
+            tried++;
+            List<Point> pts = history(id, from, now);
+            if (pts.size() > 20) { synchronized (HISTORY) { HISTORY.put(id, pts); } loaded++; }
+            if (i == 4 && loaded == 0) {           // first five all failed: the source is down or changed, stop hammering it
+                status = "§cno price history could be downloaded" + (lastError != null ? " (" + lastError + ")" : "");
+                Health.fail(PRICES, "none of the first 5 items could be downloaded" + (lastError != null ? " - " + lastError : ""));
+                builtAt = System.currentTimeMillis();
+                return;
+            }
+        }
+        if (loaded == 0) {
+            status = "§cno price history could be downloaded" + (lastError != null ? " (" + lastError + ")" : "");
+            Health.fail(PRICES, "no item had enough history" + (lastError != null ? " - " + lastError : ""));
+            builtAt = System.currentTimeMillis();
+            return;
         }
         status = "calculating…";
         signals = compute();
         builtAt = System.currentTimeMillis();
-        status = "§aready §7(" + HISTORY.size() + " items, " + terms.size() + " mayor terms)";
+        Health.ok(PRICES, loaded + " of " + tried + " items" + (loaded < tried && lastError != null ? " (some failed: " + lastError + ")" : ""));
+        status = "§aready §7(" + HISTORY.size() + " items with history, " + terms.size() + " mayor terms"
+                + (lastError != null ? ", §e" + lastError + "§7" : "") + ")";
     }
+
+    /** Full range first; if that gives nothing, the last week only (enough for trends and movers). */
+    private static List<Point> history(String id, Instant from, Instant now) {
+        String base = "https://sky.coflnet.com/api/bazaar/" + id + "/history";
+        try {
+            List<Point> pts = parseHistory(cached("h_" + id, base + "?start=" + from + "&end=" + now, MarketSignals::enoughPoints));
+            if (pts.size() > 20) return pts;
+        } catch (Exception e) { lastError = e.getMessage(); }
+        try {
+            List<Point> pts = parseHistory(cached("w_" + id, base + "/week", MarketSignals::enoughPoints));
+            if (pts.size() > 20) return pts;
+        } catch (Exception e) { lastError = e.getMessage(); }
+        try {
+            Instant weekAgo = now.minus(Duration.ofDays(7));
+            return parseHistory(cached("w2_" + id, base + "?start=" + weekAgo + "&end=" + now, MarketSignals::enoughPoints));
+        } catch (Exception e) { lastError = e.getMessage(); }
+        return List.of();
+    }
+
+    private static boolean enoughPoints(String body) { return parseHistory(body).size() > 20; }
 
     /** Real-time start of the given SkyBlock event in every SkyBlock year covered by the data. */
     private static List<Long> eventStarts(int month, int day, long from, long to) {
@@ -259,14 +383,15 @@ public final class MarketSignals {
     // ---------------------------------------------------------------- menu
 
     public static Screen screen(Screen parent) {
-        if (signals.isEmpty() && !running && System.currentTimeMillis() - builtAt > 60_000) refresh();
+        if (HISTORY.isEmpty() && !running && System.currentTimeMillis() - builtAt > 30_000) refresh();
         final MenuScreen[] ref = new MenuScreen[1];
         ref[0] = new MenuScreen("Market signals", List.of(
                 new Tab("Mayor", () -> page("Mayor", ref)),
                 new Tab("Events", () -> page("Event", ref)),
                 new Tab("Trends", () -> page("Trend", ref)),
+                new Tab("Movers", () -> movers(ref)),
                 new Tab("How this works", MarketSignals::help)
-        ), 0, parent).searchable();
+        ), 0, parent).searchable().liveWhile(() -> running);
         return ref[0];
     }
 
@@ -286,12 +411,50 @@ public final class MarketSignals {
             try { java.nio.file.Files.walk(CACHE).filter(java.nio.file.Files::isRegularFile).forEach(f -> f.toFile().delete()); } catch (Exception ignored) {}
             refresh(); ref[0].refresh();
         }), new Action("Recalculate", "Recompute from the downloaded data (e.g. after the election leader changed).", () -> { signals = compute(); ref[0].refresh(); }));
+        if (rows.isEmpty()) rows.add(new Row(running ? "§eLoading… §7" + status : HISTORY.isEmpty()
+                ? "§cNo price history yet. §7" + status
+                : "§7No " + kind.toLowerCase(Locale.ROOT) + " signal passed the backtest right now. §8See the Movers tab, or lower the minimums in Settings → Bazaar → Market signals."));
         List<String> footer = new ArrayList<>();
-        footer.add("§7Status: " + status + (running ? " §8(keeps loading in the background — reopen in a moment)" : ""));
+        footer.add("§7Status: " + status + (running ? " §8(updates by itself)" : ""));
+        if (status.startsWith("§c")) footer.add("§8Why it failed, and a Retry button: /skyassist status (Data tab).");
         if (kind.equals("Mayor")) footer.add("§7Current mayor: §f" + (Election.mayor != null ? Election.mayor : "?") + "§7, election leader: §f"
                 + (Election.leader != null ? Election.leader + String.format(Locale.US, " (%.0f%%)", Election.leaderShare) : "no election running"));
         footer.add("§8Only signals that held up in the backtest are shown. These are statistics from the past, not guarantees.");
         return new Page(new String[]{"Item", "When", "Expected", "Backtest"}, new int[]{150, 120, 60, 70}, rows, top, footer);
+    }
+
+    /** Biggest 24 h / 7 d moves among the items with history: always something to look at. */
+    private static Page movers(MenuScreen[] ref) {
+        Map<String, List<Point>> hist;
+        synchronized (HISTORY) { hist = new LinkedHashMap<>(HISTORY); }
+        long now = System.currentTimeMillis();
+        record Move(String id, double now, double d1, double d7) {}
+        List<Move> moves = new ArrayList<>();
+        for (var e : hist.entrySet()) {
+            List<Point> pts = e.getValue();
+            double p = pts.get(pts.size() - 1).price();
+            double a = median(pts, now - 2 * 86_400_000L, now - 86_400_000L), b = median(pts, now - 8 * 86_400_000L, now - 6 * 86_400_000L);
+            if (a <= 0 && b <= 0) { a = pts.get(0).price(); }
+            moves.add(new Move(e.getKey(), p, a > 0 ? (p / a - 1) * 100 : Double.NaN, b > 0 ? (p / b - 1) * 100 : Double.NaN));
+        }
+        moves.sort((x, y) -> Double.compare(Math.abs(Double.isNaN(y.d7) ? y.d1 : y.d7), Math.abs(Double.isNaN(x.d7) ? x.d1 : x.d7)));
+        List<Row> rows = new ArrayList<>();
+        for (Move m : moves) {
+            String name = Prices.nameOf(m.id());
+            rows.add(new Row(new String[]{"§f" + name, "§f" + Bazaar.Fmt1(m.now()), color(m.d1()), color(m.d7())},
+                    "§f" + name + "\n§7Now " + Bazaar.Fmt1(m.now()) + "\n§724 h " + color(m.d1()) + "  §77 d " + color(m.d7()),
+                    List.of(new Action("§eBazaar", "Open " + name + " in the Bazaar.", () -> MenuScreen.runCommand("bz " + name)))));
+        }
+        if (rows.isEmpty()) rows.add(new Row(running ? "§eLoading… §7" + status : "§cNo price history yet. §7" + status));
+        List<String> footer = new ArrayList<>();
+        footer.add("§7Status: " + status);
+        if (status.startsWith("§c")) footer.add("§8Why it failed, and a Retry button: /skyassist status (Data tab).");
+        footer.add("§8Sorted by the biggest 7-day move. Data: SkyCofl (sky.coflnet.com).");
+        return new Page(new String[]{"Item", "Price", "24 h", "7 d"}, new int[]{150, 80, 60, 60}, rows, List.of(), footer);
+    }
+
+    private static String color(double v) {
+        return Double.isNaN(v) ? "§8-" : (v >= 0 ? "§a+" : "§c") + String.format(Locale.US, "%.1f%%", v);
     }
 
     private static Page help() {

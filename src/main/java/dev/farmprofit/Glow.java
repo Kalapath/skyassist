@@ -132,7 +132,11 @@ public final class Glow {
             if (!(o instanceof Entity t) || t == spawnedBy || !t.hasCustomName() || t.getCustomName() == null) continue;
             if (Math.abs(t.getX() - spawnedBy.getX()) > 1.0 || Math.abs(t.getZ() - spawnedBy.getZ()) > 1.0 || Math.abs(t.getY() - spawnedBy.getY()) > 1.2) continue;
             String s = Tracker.strip(t.getCustomName().getString()).trim();
-            if (s.contains("❤")) { bossTag = s; bossSeen = System.currentTimeMillis(); }
+            if (s.contains("❤")) {
+                bossTag = s;
+                bossSeen = System.currentTimeMillis();
+                Safe.run("Slayer boss timer", SlayerTimes::onBossSeen);
+            }
             else if (s.matches("^\\d{1,2}:\\d{2}$")) bossTimer = s;
         }
     }

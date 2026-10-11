@@ -29,7 +29,7 @@ public final class DianaBurrows {
     private static int tick;
     private static final String[] ARROWS = {"↑", "↗", "→", "↘", "↓", "↙", "←", "↖"};
 
-    private static boolean onDiana() {
+    static boolean onDiana() {
         if (!Config.get().dianaHelper) return false;
         String a = Tracker.areaName;
         return (a != null && a.contains("Hub")) || Tracker.sessions.containsKey(Tracker.DIANA);

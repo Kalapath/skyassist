@@ -18,6 +18,7 @@ public final class Hud {
     }
 
     public static String title(String type) {
+        if (type == null) type = Tracker.FARMING;              // sessions saved by very old versions have no type
         if (Tracker.isMiningType(type)) {
             boolean here = Tracker.MINING.equals(Tracker.area) && Tracker.areaName != null && Tracker.MINING.equals(type);
             return "§2§l⛏ Mining" + (here ? " §7(" + Tracker.areaName + ")" : "");
@@ -58,7 +59,8 @@ public final class Hud {
             if (details) addCommissions(out, type);
             if (together && Tracker.DUNGEONS.equals(type)) Secrets.addHudLines(out);
             if (Tracker.FARMING.equals(type)) Pests.addHudLines(out);
-            if (Tracker.MINING.equals(type)) { Mineshafts.addHudLines(out); PowderChests.addHudLines(out, null); }
+            if (Tracker.FARMING.equals(type) && Config.get().farmShowAim) { String a = aimLine(); if (a != null) out.add(a); }
+            if (Tracker.MINING.equals(type)) { Mineshafts.addHudLines(out); PowderChests.addHudLines(out, null); AbilityAlert.addHudLines(out); }
             return out;
         }
 
@@ -69,9 +71,10 @@ public final class Hud {
         if (cfg.hudShowTime) out.add("§7Time: §f" + Fmt.duration(s.durationMs(now)));
         if (s.isCombat()) { String boss = Glow.bossLine(); if (boss != null) out.add(boss); addCombatLines(out, s, now); }
         if (s.isFishing()) { FishingAlert.addHudLines(out); FishingExtras.addHudLines(out); }
-        if (s.isMining()) { Mineshafts.addHudLines(out); PowderChests.addHudLines(out, s); }
+        if (s.isMining()) { Mineshafts.addHudLines(out); PowderChests.addHudLines(out, s); AbilityAlert.addHudLines(out); }
         if (details) addActivityLine(out, s, now);
         if (s.isCombat() && cfg.combatShowBosses && (s.totalBreaks() > 0 || s.slayerQuests > 0)) addBossLine(out, s, now);
+        if (s.isCombat()) SlayerTimes.addHudLines(out);
         if ((s.isDungeons() && cfg.dungShowRuns) || (s.isKuudra() && cfg.kuudraShowRuns)) addRunLine(out, s, now);
         if (s.isDiana() && cfg.dianaShowBurrows) out.add("§7Burrows: §e" + Fmt.num(s.burrows) + rate(s.burrows, s, now));
         if (s.isDiana()) DianaBurrows.addHudLines(out);
@@ -88,6 +91,8 @@ public final class Hud {
         if (s.coins > 0) out.add("§7Coins found: §6+" + Fmt.coins(s.coins));
         if (cfg.hudShowCosts) addCostLines(out, s);
         if (cfg.hudShowRate) out.add("§7Profit/h: §6" + (s.durationMs(now) < 60_000 ? "§8wait 1 min" : Fmt.coins(s.perHour(now)) + "/h"));
+        String xp = SkillXp.hudLine(type);
+        if (xp != null) out.add(xp);
         if (cfg.hudShowTotal) addTotalLine(out, type);
 
         String tip = cfg.separatePanels ? null : Suggest.hudLine(s, type);
@@ -224,6 +229,18 @@ public final class Hud {
         } else if (s.isFarming() && c.farmShowBps) {
             out.add("§7Farming: §a" + s.mainCrop() + " §8(" + Fmt.num(s.totalBreaks()) + " broken, " + bps);
         }
+        if (s.isFarming() && c.farmShowAim) { String a = aimLine(); if (a != null) out.add(a); }
+    }
+
+    /** "Yaw -45.0  Pitch 2.5": where you're looking, for lining up with crop rows. Null if it can't be read. */
+    static String aimLine() {
+        var mc = net.minecraft.client.Minecraft.getInstance();
+        if (mc.player == null) return null;
+        double yaw = Reflect.num(Reflect.call(mc.player, new String[]{"getYRot", "getYaw"}), Double.NaN);
+        double pitch = Reflect.num(Reflect.call(mc.player, new String[]{"getXRot", "getPitch"}), Double.NaN);
+        if (Double.isNaN(yaw) || Double.isNaN(pitch)) return null;
+        yaw = ((yaw + 180) % 360 + 360) % 360 - 180;                // like F3: -180 to 180
+        return String.format(Locale.US, "§7Yaw: §f%.1f §7Pitch: §f%.1f", yaw, pitch);
     }
 
     /** Kills, kills/h, most-killed mobs, and for grinds: drop odds and "since last drop". */

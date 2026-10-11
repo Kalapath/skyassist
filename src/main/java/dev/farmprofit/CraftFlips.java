@@ -3,7 +3,6 @@ package dev.farmprofit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Map;
 
 /**
  * Buy the ingredients, craft, sell for more:

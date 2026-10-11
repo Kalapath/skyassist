@@ -30,7 +30,8 @@ public final class History {
                 sessions = Config.GSON.fromJson(Files.readString(FILE), new TypeToken<List<Session>>() {}.getType());
             }
         } catch (Exception e) {
-            FarmProfitClient.LOG.warn("Could not read history", e);
+            FarmProfitClient.LOG.warn("Could not read history (the old file is kept as .broken)", e);
+            Config.backupBroken(FILE);
         }
         if (sessions == null) sessions = new ArrayList<>();
     }
@@ -38,7 +39,7 @@ public final class History {
     private static void save() {
         try {
             Files.createDirectories(Config.DIR);
-            Files.writeString(FILE, Config.GSON.toJson(sessions));
+            Config.write(FILE, Config.GSON.toJson(sessions));
         } catch (Exception e) {
             FarmProfitClient.LOG.warn("Could not save history", e);
         }

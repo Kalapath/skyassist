@@ -4,12 +4,8 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import net.minecraft.network.chat.Component;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -32,35 +28,42 @@ public final class Enchants {
             "fatal tempo", "flash", "flowstate", "habanero tactics", "inferno", "last stand", "legion", "no pain no gain",
             "one for all", "refrigerate", "reiterate", "rend", "soul eater", "swarm", "the one", "ultimate jerry", "ultimate wise", "wisdom");
     private static volatile long lastFetch;
+    private static final String NAME = "Enchant data";
+
+    static { Health.onRetry(NAME, () -> lastFetch = 0); }
 
     public static int count() { return DATA.size(); }
 
     public static void tick() {
-        String url = Config.get().enchantDataUrl;
-        if (url == null || url.isBlank()) return;
+        Config c = Config.get();
+        if (c.enchantDataUrl == null || c.enchantDataUrl.isBlank()) { Health.off(NAME, "no data address in the settings"); return; }
+        if (!c.enchantColors) { Health.off(NAME, "Enchant colors are turned off"); return; }
         long now = System.currentTimeMillis();
-        if (now - lastFetch < (DATA.isEmpty() ? 10 * 60_000 : 24 * 3_600_000L)) return;
+        long wait = DATA.isEmpty() ? Health.delay(NAME, 5 * 60_000L, 5 * 60_000L) : Health.delay(NAME, 24 * 3_600_000L, 30 * 60_000L);
+        if (now - lastFetch < wait) return;
         lastFetch = now;
-        HttpClient.newHttpClient().sendAsync(HttpRequest.newBuilder(URI.create(url)).header("User-Agent", "SkyAssist")
-                        .timeout(Duration.ofSeconds(20)).GET().build(), HttpResponse.BodyHandlers.ofString())
-                .thenAccept(r -> { if (r.statusCode() == 200) parse(r.body()); })
-                .exceptionally(e -> null);
+        Http.get(NAME, c.enchantDataUrl, 20, Enchants::parse);
     }
 
-    private static void parse(String body) {
-        try {
-            JsonObject root = JsonParser.parseString(body).getAsJsonObject();
-            for (var e : root.entrySet()) {
+    private static String parse(String body) {
+        JsonObject root = JsonParser.parseString(body).getAsJsonObject();
+        Map<String, int[]> found = new HashMap<>();
+        for (var e : root.entrySet()) {
+            try {
                 if (!e.getValue().isJsonObject()) continue;
                 JsonObject o = e.getValue().getAsJsonObject();
                 int table = o.has("max_table") ? o.get("max_table").getAsInt() : 0;
                 int max = o.has("max") ? o.get("max").getAsInt() : table;
                 int ult = o.has("ultimate") && o.get("ultimate").getAsBoolean() ? 1 : 0;
                 int[] v = {table, max, ult};
-                DATA.put(e.getKey().toLowerCase(Locale.ROOT).replace('_', ' '), v);
-                if (o.has("name")) DATA.put(o.get("name").getAsString().toLowerCase(Locale.ROOT), v);
-            }
-        } catch (Exception ignored) {}
+                found.put(e.getKey().toLowerCase(Locale.ROOT).replace('_', ' '), v);
+                if (o.has("name")) found.put(o.get("name").getAsString().toLowerCase(Locale.ROOT), v);
+            } catch (Exception skipThisOne) { /* one odd entry shouldn't lose the rest */ }
+        }
+        if (found.isEmpty()) throw new IllegalStateException("no enchantments found in the file");
+        DATA.clear();
+        DATA.putAll(found);
+        return Health.count(found.size(), "names");
     }
 
     private static int level(String s) {

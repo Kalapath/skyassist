@@ -64,7 +64,7 @@ public final class Accessories {
     static void ingest(String id, JsonObject item) {
         if (!item.has("lore") || !item.get("lore").isJsonArray()) return;
         var lore = item.getAsJsonArray("lore");
-        for (int i = lore.size() - 1; i >= 0 && i >= lore.size() - 3; i--) {
+        for (int i = lore.size() - 1; i >= 0 && i >= lore.size() - 6; i--) {
             String line = Tracker.strip(lore.get(i).getAsString());
             Matcher m = RARITY.matcher(line);
             if (m.find()) {
@@ -125,7 +125,7 @@ public final class Accessories {
             Map<String, Object> m = new HashMap<>();
             m.put("owned", new ArrayList<>(owned));
             m.put("scannedAt", scannedAt);
-            Files.writeString(FILE, Config.GSON.toJson(m));
+            Config.write(FILE, Config.GSON.toJson(m));
         } catch (Exception ignored) {}
     }
 

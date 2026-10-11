@@ -157,7 +157,7 @@ public final class Greenhouse {
             m.put("v", 2);
             m.put("have", new ArrayList<>(have()));
             m.put("target", target);
-            Files.writeString(FILE, Config.GSON.toJson(m));
+            Config.write(FILE, Config.GSON.toJson(m));
         } catch (Exception ignored) {}
     }
 

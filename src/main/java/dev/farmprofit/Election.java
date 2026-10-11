@@ -3,55 +3,61 @@ package dev.farmprofit;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
 /** Current mayor and perks from Hypixel's public election data. */
 public final class Election {
     private static final String URL = "https://api.hypixel.net/v2/resources/skyblock/election";
-    private static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+    private static final String NAME = "Mayor & election";
     public static volatile String mayor;
     /** The running election (Hypixel's "current" block): leading candidate and their vote share, if an election is on. */
     public static volatile String leader;
     public static volatile double leaderShare;
+    /** The election year of the current mayor (Hypixel's numbering), -1 if unknown. */
+    public static volatile int mayorYear = -1;
     public static volatile List<String> perks = new ArrayList<>();
     private static volatile long lastFetch;
 
+    static { Health.onRetry(NAME, () -> lastFetch = 0); }
+
     public static void tick() {
         long now = System.currentTimeMillis();
-        if (now - lastFetch < 30 * 60_000) return;
+        if (now - lastFetch < Health.delay(NAME, 30 * 60_000L, 2 * 60_000L)) return;
         lastFetch = now;
-        HTTP.sendAsync(HttpRequest.newBuilder(URI.create(URL)).header("User-Agent", "SkyAssist")
-                        .timeout(Duration.ofSeconds(20)).GET().build(), HttpResponse.BodyHandlers.ofString())
-                .thenAccept(r -> { if (r.statusCode() == 200) parse(r.body()); })
-                .exceptionally(e -> null);
+        Http.get(NAME, URL, 20, Election::parse);
     }
 
-    private static void parse(String body) {
-        try {
-            JsonObject m = JsonParser.parseString(body).getAsJsonObject().getAsJsonObject("mayor");
-            List<String> p = new ArrayList<>();
-            if (m.has("perks")) for (var el : m.getAsJsonArray("perks")) p.add(el.getAsJsonObject().get("name").getAsString());
-            perks = p;
-            mayor = m.get("name").getAsString();
-            JsonObject root = JsonParser.parseString(body).getAsJsonObject();
-            leader = null;
-            if (root.has("current") && root.get("current").isJsonObject() && root.getAsJsonObject("current").has("candidates")) {
-                long total = 0, best = -1;
-                for (var el : root.getAsJsonObject("current").getAsJsonArray("candidates")) {
-                    JsonObject c = el.getAsJsonObject();
-                    long v = c.has("votes") ? c.get("votes").getAsLong() : 0;
-                    total += v;
-                    if (v > best) { best = v; leader = c.get("name").getAsString(); }
-                }
-                leaderShare = total > 0 ? 100.0 * best / total : 0;
+    private static String parse(String body) {
+        JsonObject root = JsonParser.parseString(body).getAsJsonObject();
+        if (!root.has("mayor") || !root.get("mayor").isJsonObject()) throw new IllegalStateException("no mayor in the response");
+        JsonObject m = root.getAsJsonObject("mayor");
+        List<String> p = new ArrayList<>();
+        if (m.has("perks") && m.get("perks").isJsonArray())
+            for (var el : m.getAsJsonArray("perks")) if (el.isJsonObject() && el.getAsJsonObject().has("name")) p.add(el.getAsJsonObject().get("name").getAsString());
+        String name = m.get("name").getAsString();
+        int year = -1;
+        if (m.has("election") && m.get("election").isJsonObject() && m.getAsJsonObject("election").has("year"))
+            year = m.getAsJsonObject("election").get("year").getAsInt();
+        String lead = null;
+        double share = 0;
+        if (root.has("current") && root.get("current").isJsonObject() && root.getAsJsonObject("current").has("candidates")) {
+            long total = 0, best = -1;
+            for (var el : root.getAsJsonObject("current").getAsJsonArray("candidates")) {
+                JsonObject c = el.getAsJsonObject();
+                long v = c.has("votes") ? c.get("votes").getAsLong() : 0;
+                total += v;
+                if (v > best) { best = v; lead = c.get("name").getAsString(); }
             }
-        } catch (Exception ignored) {}
+            share = total > 0 ? 100.0 * best / total : 0;
+        }
+        // set at the end, so the HUD never sees a half-read answer
+        perks = p;
+        mayor = name;
+        if (year > 0) mayorYear = year;
+        leaderShare = share;
+        leader = lead;
+        return name + (lead != null ? ", election leader " + lead : ", no election running");
     }
 
     /** Which activity the current mayor helps, e.g. Finnegan -> Farming. */

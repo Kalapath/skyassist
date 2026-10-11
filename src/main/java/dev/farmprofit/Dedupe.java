@@ -27,6 +27,8 @@ public final class Dedupe {
                 skyblocker ? "Skyblocker" : odin ? "Odin" : "Secret Routes"));
         if (skyhanni) out.add(new Overlap("contestAlert", "Jacob's contest reminder", "SkyHanni"));
         if (skyhanni) out.add(new Overlap("enchantColors", "Enchantment colors", "SkyHanni"));
+        if (skyhanni) out.add(new Overlap("skillXpHud", "Skill XP/h line", "SkyHanni"));
+        if (skyhanni) out.add(new Overlap("abilityAlert", "Pickaxe ability ready alert", "SkyHanni"));
         if (skyblocker || odin) {
             String who = skyblocker ? "Skyblocker" : "Odin";
             out.add(new Overlap("solveWeirdos", "Three Weirdos solver", who));

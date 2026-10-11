@@ -37,15 +37,24 @@ public final class CraftCost {
     /** id -> short "how to get it" text from the item data (e.g. "Requires Farming Skill 7") */
     public static final Map<String, String> HINTS = new ConcurrentHashMap<>();
     private static final Path ZIP = Config.DIR.resolve("neu-repo.zip");
+    private static final Path TMP = Config.DIR.resolve("neu-repo.tmp");
+    private static final String NAME = "Recipes (NEU repo)";
     private static volatile boolean loading;
     private static volatile long lastCheck;
+    /** A retry from the Status page downloads again even if the saved copy is recent. */
+    private static volatile boolean forceDownload;
+    /** Identifies the saved copy that was last read, so an unchanged file isn't read again every few hours. */
+    private static volatile String parsedStamp = "";
+
+    static { Health.onRetry(NAME, () -> { forceDownload = true; lastCheck = 0; }); }
 
     public static int count() { return RECIPES.size(); }
 
     public static void tick() {
         if (loading) return;                  // also needed for /talismans, so it loads even with tooltips off
         long now = System.currentTimeMillis();
-        if (now - lastCheck < (RECIPES.isEmpty() ? 15 * 60_000 : 6 * 3_600_000L)) return;
+        long wait = RECIPES.isEmpty() ? Health.delay(NAME, 15 * 60_000L, 15 * 60_000L) : Health.delay(NAME, 6 * 3_600_000L, 30 * 60_000L);
+        if (now - lastCheck < wait) return;
         lastCheck = now;
         loading = true;
         Thread t = new Thread(CraftCost::load, "skyassist-recipes");
@@ -53,25 +62,63 @@ public final class CraftCost {
         t.start();
     }
 
+    /** Downloads the NEU item repository when the saved copy is missing or a week old, then reads it (if it changed). */
     private static void load() {
         try {
-            boolean stale = !Files.exists(ZIP) || System.currentTimeMillis() - Files.getLastModifiedTime(ZIP).toMillis() > 7 * 86_400_000L;
+            boolean force = forceDownload;
+            forceDownload = false;
             String url = Config.get().neuRepoUrl;
-            if (stale && url != null && !url.isBlank()) {
-                HttpClient http = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.ALWAYS).connectTimeout(Duration.ofSeconds(15)).build();
-                HttpResponse<Path> r = http.send(HttpRequest.newBuilder(URI.create(url)).header("User-Agent", "SkyAssist")
-                        .timeout(Duration.ofMinutes(3)).GET().build(), HttpResponse.BodyHandlers.ofFile(Config.DIR.resolve("neu-repo.tmp")));
-                if (r.statusCode() == 200) Files.move(r.body(), ZIP, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            boolean haveZip = Files.exists(ZIP);
+            boolean stale = force || !haveZip || System.currentTimeMillis() - Files.getLastModifiedTime(ZIP).toMillis() > 7 * 86_400_000L;
+            String problem = null;
+            if (stale) {
+                if (url == null || url.isBlank()) {
+                    problem = "no download address in the settings";
+                } else {
+                    Health.attempt(NAME, url);
+                    try {
+                        HttpClient http = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.ALWAYS).connectTimeout(Duration.ofSeconds(15)).build();
+                        HttpResponse<Path> r = http.send(HttpRequest.newBuilder(URI.create(url)).header("User-Agent", "SkyAssist")
+                                .timeout(Duration.ofMinutes(3)).GET().build(), HttpResponse.BodyHandlers.ofFile(TMP));
+                        if (r.statusCode() == 200) Files.move(TMP, ZIP, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                        else problem = Http.status(r.statusCode());
+                    } catch (Exception e) {
+                        problem = Http.reason(e);
+                    } finally {
+                        try { Files.deleteIfExists(TMP); } catch (Exception ignored) {}      // never leave a half-downloaded file behind
+                    }
+                }
             }
-            if (Files.exists(ZIP)) parse();
-        } catch (Exception e) {
-            FarmProfitClient.LOG.warn("Recipe data couldn't be loaded", e);
+            if (Files.exists(ZIP)) {
+                String stamp = Files.getLastModifiedTime(ZIP).toMillis() + ":" + Files.size(ZIP);
+                String detail;
+                if (stamp.equals(parsedStamp) && !RECIPES.isEmpty()) {
+                    detail = Health.count(RECIPES.size(), "recipes");
+                } else {
+                    try {
+                        detail = parse();
+                        parsedStamp = stamp;
+                    } catch (java.util.zip.ZipException bad) {
+                        try { Files.deleteIfExists(ZIP); } catch (Exception ignored) {}       // damaged: fetch a fresh one next time
+                        parsedStamp = "";
+                        throw bad;
+                    }
+                }
+                Health.ok(NAME, detail + (problem != null ? " (saved copy)" : ""));
+                if (problem != null) Health.fail(NAME, problem + " - using the copy saved on disk");
+            } else if (problem != null) {
+                Health.fail(NAME, problem);
+            } else {
+                Health.fail(NAME, "nothing was downloaded");
+            }
+        } catch (Throwable e) {
+            Health.fail(NAME, "couldn't read the recipe data: " + Safe.describe(e));
         } finally {
             loading = false;
         }
     }
 
-    private static void parse() throws Exception {
+    private static String parse() throws Exception {
         Map<String, Recipe> found = new HashMap<>();
         try (ZipFile zip = new ZipFile(ZIP.toFile())) {
             var entries = zip.entries();
@@ -143,8 +190,10 @@ public final class CraftCost {
                 } catch (Exception ignored) {}
             }
         }
+        if (found.isEmpty()) throw new IllegalStateException("no recipes found in the file (is the address a NotEnoughUpdates-REPO zip?)");
         RECIPES.clear();
         RECIPES.putAll(found);
+        return Health.count(found.size(), "recipes") + ", " + Health.count(NPC_SHOP.size(), "shop items");
     }
 
     /** What it costs to buy one (Bazaar instabuy or lowest BIN), 0 if unknown. */

@@ -1,5 +1,28 @@
 # Changelog
 
+## 8.13.0
+- Price alerts: `/alert <item> below|above <price> [buy|sell]` pings you (ding + big text + a chat line with an *Open in Bazaar* button) when a Bazaar item crosses your price; `/alerts` menu; saved in `price-alerts.json`; Bazaar refreshes as often as *Order check every* while alerts wait.
+- Pickaxe ability: cooldown line on the Mining HUD and a ready alert, read from Hypixel's chat messages.
+- Skill XP/h line (with time to the next level) from the XP numbers above the hotbar.
+- Slayer boss kill time (best / average per boss and tier, `slayer-times.json`) in chat and on the Combat HUD.
+- Big on-screen alerts + sound for all of the above (Settings → General → Alerts), optional full-inventory warning.
+- Keep cursor between menus (on): the pointer stays where it was when SkyBlock swaps one menu for another.
+- Quick-command buttons beside the inventory (off): Name=/command list in the settings; a command is sent only when you click.
+- Upgrade value in item tooltips (on): enchants as books, Hot / Fuming Potato Books, Recombobulator, gems, drill parts and a few more at Bazaar prices (a rough extra).
+- Optional yaw / pitch line on the Farming HUD (off).
+- Settings reordered with room for new ones (each new option sits in its own activity tab); "Disable swimming pose" now warns that it also changes your hitbox and water movement (Hypixel's rules don't allow changing movement; it stays off by default); Dedupe and the Status page know Firmament, NoFrills, SkyOcean and SkyHanni's overlaps.
+
+## 8.12.0
+- Status page (`/skyassist status`): every data source with state, reason and Retry; caught problems; what the mod can see; Copy report (`/profit report`).
+- Safety net: errors inside one feature are caught and listed instead of crashing the game or the connection; a feature that keeps failing pauses for a minute.
+- Shared download helper: retry with growing waits, keeps last good data, shows why a source failed.
+- Atomic saves for settings, history, totals and data files; unreadable files are kept as `.broken` instead of being replaced.
+- What's new page (`/skyassist news`) and a one-time chat notice after an update (setting: Tell me what's new).
+- Update check follows redirects and the renamed `Kalapath/skyassist` repo; Gradle 9.4.1 / 9.5.0 per Minecraft version in CI; mod icon and links; small number-format and text fixes.
+
+## 8.11.1
+- /market: live-updating menu, waits for prices, tolerant history/mayor parsing with week fallback, rate-limit retry, error shown, Movers tab.
+
 ## 8.11.0
 - Best settings button / `/flips tune`: picks flip filters for the most profit per work from live prices and your budget; Undo / `/flips untune`.
 

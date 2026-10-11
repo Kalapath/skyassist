@@ -54,7 +54,7 @@ public final class FarmProfitClient implements ClientModInitializer {
             macroKeys[i] = KeyMappingHelper.registerKeyMapping(new KeyMapping(
                     "key.skyassist.macro" + (i + 1), InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, category));
         }
-        ClientTickEvents.END_CLIENT_TICK.register(client -> {
+        ClientTickEvents.END_CLIENT_TICK.register(client -> Safe.run("Hotkeys", () -> {
             for (int i = 0; i < macroKeys.length; i++) {
                 while (macroKeys[i].consumeClick()) if (Compat.noScreen(client)) Macros.run(i + 1);
             }
@@ -64,77 +64,95 @@ public final class FarmProfitClient implements ClientModInitializer {
             while (settingsKey.consumeClick()) {
                 if (Compat.noScreen(client)) Compat.setScreen(client, new SettingsScreen());
             }
-        });
+        }));
 
         Config.load();
         Prices.refresh();
-        if (net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("hypixel-mod-api")) HypixelLocation.init();
+        try {
+            if (net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("hypixel-mod-api")) HypixelLocation.init();
+        } catch (Throwable t) {
+            Safe.report("Hypixel Mod API link", t);
+        }
+        // Everything below runs inside the game's own loops (drawing, ticks, packets). Each piece is wrapped in Safe, so a
+        // problem in one feature is skipped and listed in /skyassist status instead of crashing the game or the connection.
         ItemTooltipCallback.EVENT.register((stack, context, flag, lines) -> {
-            Enchants.color(lines);
-            PriceTooltip.add(stack, lines);
-            CraftCost.add(stack, lines);
-            TooltipScroll.apply(lines);
+            Safe.run("Enchant colors", () -> Enchants.color(lines));
+            Safe.run("Price tooltips", () -> PriceTooltip.add(stack, lines));
+            Safe.run("Craft cost tooltips", () -> CraftCost.add(stack, lines));
+            Safe.run("Upgrade value tooltips", () -> ItemValue.add(stack, lines));
+            Safe.run("Tooltip scrolling", () -> TooltipScroll.apply(lines));
         });
         // mouse wheel inside menus scrolls long tooltips (and only then; otherwise the menu scrolls as usual)
         // Per-menu hooks MUST be attached after the menu is set up: Fabric recreates a menu's events every time it's
         // (re)initialised, so anything attached earlier is thrown away. Re-attaching on every init is therefore correct.
         ScreenEvents.AFTER_INIT.register((client, screen, w, h) -> {
-            ScreenMouseEvents.allowMouseScroll(screen).register((s, mouseX, mouseY, horizontal, vertical) ->
-                    TooltipScroll.onScroll(vertical));
-            ScreenOverlay.register(screen);             // rarity colors, item labels, search highlights, terminal solvers
-            InvSearch.attach(screen, w, h);             // search box (+ its key handling)
+            Safe.run("Tooltip scrolling hook", () -> ScreenMouseEvents.allowMouseScroll(screen).register((s, mouseX, mouseY, horizontal, vertical) ->
+                    Safe.test("Tooltip scrolling", () -> TooltipScroll.onScroll(vertical), true)));
+            Safe.run("Menu overlays hook", () -> ScreenOverlay.register(screen));    // rarity colors, item labels, search highlights, terminal solvers
+            Safe.run("Search box hook", () -> InvSearch.attach(screen, w, h));       // search box (+ its key handling)
+            Safe.run("Inventory buttons hook", () -> InvButtons.attach(screen, w, h));   // quick-command buttons (off by default)
         });
 
         // Crops (farming breaks happen on the client)
-        ClientPlayerBlockBreakEvents.AFTER.register((level, player, pos, state) -> Tracker.onClientBreak(pos, state));
+        ClientPlayerBlockBreakEvents.AFTER.register((level, player, pos, state) -> Safe.run("Block break tracking", () -> Tracker.onClientBreak(pos, state)));
         AttackBlockCallback.EVENT.register((player, level, hand, pos, direction) -> {
-            if (player == Minecraft.getInstance().player) Tracker.onStartBreak(pos);
+            Safe.run("Block hit tracking", () -> { if (player == Minecraft.getInstance().player) Tracker.onStartBreak(pos); });
             return InteractionResult.PASS;
         });
 
         // Hitting mobs: combat / sea creatures / pests / keeps mining & foraging alive
         AttackEntityCallback.EVENT.register((player, level, hand, entity, hit) -> {
-            if (player == Minecraft.getInstance().player) Tracker.onAttackEntity(entity);
+            Safe.run("Attack tracking", () -> { if (player == Minecraft.getInstance().player) Tracker.onAttackEntity(entity); });
             return InteractionResult.PASS;
         });
 
         // Fishing rod casts/reels, and pest vacuums
         UseItemCallback.EVENT.register((player, level, hand) -> {
-            if (player == Minecraft.getInstance().player) {
-                var stack = player.getItemInHand(hand);
-                if (Tracker.strip(stack.getHoverName().getString()).contains("Ancestral Spade")) {
-                    DianaBurrows.onSpade(player.getX(), player.getY(), player.getZ());
-                } else if (stack.getItem() instanceof FishingRodItem && FishingRods.isRealRod(stack)) {
-                    Tracker.onRodUse();
-                    FishingExtras.onCast();
-                } else if (!Tracker.MINING.equals(Tracker.area) && !Tracker.FORAGING.equals(Tracker.area)) {
-                    String name = Tracker.strip(stack.getHoverName().getString());
-                    if (name.contains("Vacuum")) Tracker.onVacuum();
+            Safe.run("Item use tracking", () -> {
+                if (player == Minecraft.getInstance().player) {
+                    var stack = player.getItemInHand(hand);
+                    if (Tracker.strip(stack.getHoverName().getString()).contains("Ancestral Spade")) {
+                        DianaBurrows.onSpade(player.getX(), player.getY(), player.getZ());
+                    } else if (stack.getItem() instanceof FishingRodItem && FishingRods.isRealRod(stack)) {
+                        Tracker.onRodUse();
+                        FishingExtras.onCast();
+                    } else if (!Tracker.MINING.equals(Tracker.area) && !Tracker.FORAGING.equals(Tracker.area)) {
+                        String name = Tracker.strip(stack.getHoverName().getString());
+                        if (name.contains("Vacuum")) Tracker.onVacuum();
+                    }
                 }
-            }
+            });
             return InteractionResult.PASS;
         });
 
+        // (an error in here would disconnect you from the server, so both parts are guarded)
         ClientReceiveMessageEvents.ALLOW_GAME.register((message, overlay) -> {
-            if (overlay) { Secrets.onActionBar(Tracker.strip(message.getString())); return true; }
-            try { Tracker.onChat(message); } catch (Throwable t) { LOG.warn("chat handling failed", t); }   // tracking first
-            return ChatFilter.allow(Tracker.strip(message.getString()).trim());                            // then the spam filter
+            if (overlay) {
+                String bar = Tracker.strip(message.getString());
+                Safe.run("Action bar reading", () -> Secrets.onActionBar(bar));
+                Safe.run("Skill XP reading", () -> SkillXp.onActionBar(bar));
+                return true;
+            }
+            Safe.run("Chat reading", () -> Tracker.onChat(message));                                                     // tracking first
+            return Safe.test("Chat filter", () -> ChatFilter.allow(Tracker.strip(message.getString()).trim()), true);    // then the spam filter
         });
 
         // Right-clicking blocks: marks dungeon secrets as done, keeps the dungeon session alive
         UseBlockCallback.EVENT.register((player, level, hand, hit) -> {
-            if (player == Minecraft.getInstance().player && Tracker.DUNGEONS.equals(Tracker.area)) {
-                Secrets.onUse(hit.getBlockPos());
-                Tracker.onDungeonAction();
-            }
+            Safe.run("Block use tracking", () -> {
+                if (player == Minecraft.getInstance().player && Tracker.DUNGEONS.equals(Tracker.area)) {
+                    Secrets.onUse(hit.getBlockPos());
+                    Tracker.onDungeonAction();
+                }
+            });
             return InteractionResult.PASS;
         });
 
-        ClientTickEvents.END_CLIENT_TICK.register(Tracker::tick);
-        ClientLifecycleEvents.CLIENT_STOPPING.register(client -> Tracker.endAll(false));
+        ClientTickEvents.END_CLIENT_TICK.register(Tracker::tick);        // (Tracker.tick guards each of its parts itself)
+        ClientLifecycleEvents.CLIENT_STOPPING.register(client -> Safe.run("Saving sessions", () -> Tracker.endAll(false)));
 
         // lockpick: a green square exactly over the spot to aim at
-        HudElementRegistry.attachElementBefore(VanillaHudElements.CHAT, Identifier.fromNamespaceAndPath("skyassist", "lockpick"), (graphics, delta) -> {
+        HudElementRegistry.attachElementBefore(VanillaHudElements.CHAT, Identifier.fromNamespaceAndPath("skyassist", "lockpick"), (graphics, delta) -> Safe.run("Lockpick marker", () -> {
             int[] p = Lockpick.screenPos(Minecraft.getInstance());
             if (p == null) return;
             int x = p[0], y = p[1];
@@ -147,15 +165,17 @@ public final class FarmProfitClient implements ClientModInitializer {
             graphics.fill(x - 7, y - 7, x + 7, y + 7, 0xFF000000);
             graphics.fill(x - 6, y - 6, x + 6, y + 6, 0xFFFFFFFF);
             graphics.fill(x - 5, y - 5, x + 5, y + 5, 0xFF39FF14);
-        });
+        }));
+        // big on-screen alerts (ability ready, price alert, inventory full)
+        HudElementRegistry.attachElementBefore(VanillaHudElements.CHAT, Identifier.fromNamespaceAndPath("skyassist", "alerts"), (graphics, delta) -> Safe.run("Big alerts", () -> Alerts.draw(graphics)));
         // rarity colors on the hotbar
-        HudElementRegistry.attachElementAfter(VanillaHudElements.HOTBAR, Identifier.fromNamespaceAndPath("skyassist", "rarity"), (graphics, delta) -> {
+        HudElementRegistry.attachElementAfter(VanillaHudElements.HOTBAR, Identifier.fromNamespaceAndPath("skyassist", "rarity"), (graphics, delta) -> Safe.run("Rarity colors (hotbar)", () -> {
             Minecraft mc = Minecraft.getInstance();
             if (Compat.hudHidden(mc)) return;
             RarityBg.drawHotbar(mc, graphics);
-        });
+        }));
         HudElementRegistry.attachElementBefore(VanillaHudElements.CHAT,
-                Identifier.fromNamespaceAndPath("skyassist", "hud"), (graphics, delta) -> {
+                Identifier.fromNamespaceAndPath("skyassist", "hud"), (graphics, delta) -> Safe.run("HUD", () -> {
                     Minecraft mc = Minecraft.getInstance();
                     Config cfg = Config.get();
                     boolean chat = Compat.screen(mc) instanceof ChatScreen;
@@ -178,6 +198,7 @@ public final class FarmProfitClient implements ClientModInitializer {
                             if (!scaled) Reflect.call(pose, "popMatrix");
                             Debug.scaleWorks = scaled;
                         }
+                        try {                       // the scale is always undone, even if drawing this panel fails
                         float eff = scaled ? sc : 1f;
                         int x = Math.round(box.x() / eff), y = Math.round(box.y() / eff), lh = box.lineH();
 
@@ -222,7 +243,9 @@ public final class FarmProfitClient implements ClientModInitializer {
                                 }
                             }
                         }
-                        if (scaled) Reflect.call(pose, "popMatrix");
+                        } finally {
+                            if (scaled) Reflect.call(pose, "popMatrix");
+                        }
                     }
                     Perf.add("HUD drawing", System.nanoTime() - perfStart);
                     if (chat) {
@@ -230,7 +253,7 @@ public final class FarmProfitClient implements ClientModInitializer {
                         graphics.text(mc.font, "§7Drag: move §8| §7Middle-click: size §8| §7Right-click title: hide §8| §7Right-click item: don't count",
                                 boxes.get(0).x(), last.bottom() + 4, 0xFFFFFFFF, true);
                     }
-                });
+                }));
 
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
             dispatcher.register(buildCommand("profit", null));
@@ -248,6 +271,17 @@ public final class FarmProfitClient implements ClientModInitializer {
                     .then(ClientCommands.literal("chat").executes(ctx -> { Accessories.show(Config.get().talismanCount); return 1; }))
                     .then(ClientCommands.argument("count", IntegerArgumentType.integer(1, 50))
                             .executes(ctx -> { TalismansScreen.requestOpen(IntegerArgumentType.getInteger(ctx, "count")); return 1; })));
+            for (String alertName : new String[]{"alert", "pricealert"}) {
+                dispatcher.register(ClientCommands.literal(alertName)
+                        .executes(ctx -> { MenuScreen.open(() -> PriceAlerts.screen(null)); return 1; })
+                        .then(ClientCommands.literal("list").executes(ctx -> { MenuScreen.open(() -> PriceAlerts.screen(null)); return 1; }))
+                        .then(ClientCommands.literal("clear").executes(ctx -> { PriceAlerts.clear(); return 1; }))
+                        .then(ClientCommands.literal("remove").then(ClientCommands.argument("number", IntegerArgumentType.integer(1))
+                                .executes(ctx -> { PriceAlerts.remove(IntegerArgumentType.getInteger(ctx, "number")); return 1; })))
+                        .then(ClientCommands.argument("what", StringArgumentType.greedyString())
+                                .executes(ctx -> { PriceAlerts.add(StringArgumentType.getString(ctx, "what")); return 1; })));
+            }
+            dispatcher.register(ClientCommands.literal("alerts").executes(ctx -> { MenuScreen.open(() -> PriceAlerts.screen(null)); return 1; }));
             dispatcher.register(ClientCommands.literal("market").executes(ctx -> { MenuScreen.open(() -> MarketSignals.screen(null)); return 1; }));
             dispatcher.register(ClientCommands.literal("itemsearch").executes(ctx -> { MenuScreen.open(() -> Storage.screen(null)); return 1; }));
             dispatcher.register(ClientCommands.literal("waypoints").executes(ctx -> { MenuScreen.open(() -> Waypoints.screen(null)); return 1; }));
@@ -309,6 +343,15 @@ public final class FarmProfitClient implements ClientModInitializer {
                             }))))
                     .then(ClientCommands.literal("settings").executes(ctx -> { SettingsScreen.requestOpen(); return 1; }))
                     .then(ClientCommands.literal("gui").executes(ctx -> { GuiEditor.open(); return 1; }))
+                    .then(ClientCommands.literal("status").executes(ctx -> { MenuScreen.open(() -> Status.screen(null)); return 1; })
+                            .then(ClientCommands.literal("chat").executes(ctx -> { Debug.show(); return 1; }))
+                            .then(ClientCommands.literal("retry").executes(ctx -> {
+                                int n = Health.retryFailed();
+                                Tracker.say("§6[SkyAssist] §7" + (n == 0 ? "Nothing is failing right now." : "Retrying " + n + " data source" + (n == 1 ? "" : "s") + "..."));
+                                return 1;
+                            }))
+                            .then(ClientCommands.literal("copy").executes(ctx -> { Status.copyReport(); return 1; })))
+                    .then(ClientCommands.literal("news").executes(ctx -> { MenuScreen.open(() -> News.screen(null)); return 1; }))
                     .then(ClientCommands.literal("setup").executes(ctx -> { SetupScreen.requestOpen(); return 1; })));
             dispatcher.register(ClientCommands.literal("profitsettings").executes(ctx -> { SettingsScreen.requestOpen(); return 1; }));
         });
@@ -384,8 +427,11 @@ public final class FarmProfitClient implements ClientModInitializer {
                             return 1;
                         })))
                 .then(ClientCommands.literal("settings").executes(ctx -> { SettingsScreen.requestOpen(); return 1; }))
-                .then(ClientCommands.literal("debug").executes(ctx -> { Debug.show(); return 1; }))
-                .then(ClientCommands.literal("report").executes(ctx -> { report(); return 1; }))
+                .then(ClientCommands.literal("debug").executes(ctx -> { MenuScreen.open(() -> Status.screen(null)); return 1; })
+                        .then(ClientCommands.literal("chat").executes(ctx -> { Debug.show(); return 1; })))
+                .then(ClientCommands.literal("status").executes(ctx -> { MenuScreen.open(() -> Status.screen(null)); return 1; }))
+                .then(ClientCommands.literal("report").executes(ctx -> { Status.copyReport(); return 1; }))
+                .then(ClientCommands.literal("news").executes(ctx -> { MenuScreen.open(() -> News.screen(null)); return 1; }))
                 .then(ClientCommands.literal("perf").executes(ctx -> { Perf.show(); return 1; })
                         .then(ClientCommands.literal("reset").executes(ctx -> { Perf.reset(); Tracker.say("§6[SkyAssist] §7Performance numbers reset."); return 1; })))
                 .then(ClientCommands.literal("setup").executes(ctx -> { SetupScreen.requestOpen(); return 1; }))
@@ -510,30 +556,6 @@ public final class FarmProfitClient implements ClientModInitializer {
         if (farming) { String c = Contests.hudLine(); if (c != null) Tracker.say(c); }
         Tracker.say("§8Based on " + (farming ? "your blocks/s and Farming Fortune" : "your Mining Speed and fortune")
                 + "; pests, rare drops and powder aren't included.");
-    }
-
-    /** Everything needed to fix detection problems, copied to the clipboard to paste into a chat with Claude. */
-    private static void report() {
-        StringBuilder r = new StringBuilder("SkyAssist report\n");
-        r.append("build ").append(UpdateCheck.thisCommit()).append(", area=").append(Tracker.areaName)
-                .append(", hud=").append(Tracker.area).append(", modapi=").append(HypixelLocation.active)
-                .append(" mode=").append(HypixelLocation.mode).append(" map=").append(HypixelLocation.map).append('\n');
-        r.append("tab keys: ").append(String.join(", ", Tracker.tab.keySet())).append('\n');
-        r.append("purse=").append(Tracker.purse).append(" floor=").append(Tracker.dungeonFloor)
-                .append(" prices=").append(Prices.bazaarCount()).append('/').append(Prices.itemCount()).append('/').append(Prices.binCount()).append('\n');
-        r.append("icons=").append(Debug.iconsWork).append(" scale=").append(Debug.scaleWorks).append(" mouse=").append(Debug.mouseWorks).append('\n');
-        r.append("recognised: ").append(Debug.SEEN).append('\n');
-        r.append("action bar: ").append(Debug.lastActionBar).append('\n');
-        r.append("unrecognised messages:\n");
-        try {
-            java.nio.file.Path f = Config.DIR.resolve("unrecognised-messages.txt");
-            if (java.nio.file.Files.exists(f)) {
-                List<String> lines = java.nio.file.Files.readAllLines(f);
-                for (String l : lines.subList(Math.max(0, lines.size() - 40), lines.size())) r.append("  ").append(l).append('\n');
-            }
-        } catch (Exception ignored) {}
-        if (Chat.copy(r.toString())) Tracker.say("§6[SkyAssist] §7Report copied to your clipboard. Paste it into your chat with Claude.");
-        else Tracker.say("§6[SkyAssist] §7Couldn't copy. Send config/skyassist/unrecognised-messages.txt and a /profit debug screenshot instead.");
     }
 
     static void exportCsv() {

@@ -523,7 +523,7 @@ public final class Bazaar {
     public static void save() {
         try {
             Files.createDirectories(Config.DIR);
-            Files.writeString(FILE, Config.GSON.toJson(state));
+            Config.write(FILE, Config.GSON.toJson(state));
         } catch (Exception e) {
             FarmProfitClient.LOG.warn("Could not save bazaar state", e);
         }

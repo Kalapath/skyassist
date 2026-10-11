@@ -23,7 +23,8 @@ final class HudRenderer {
         long now = System.currentTimeMillis();
         if (now - cacheTime > (chat ? 100 : 250)) {         // rebuild text 4x a second (10x while editing)
             cache.clear();
-            for (String id : Panels.ALL) cache.put(id, Hud.panel(id));
+            // one panel failing leaves only that panel empty (listed in /skyassist status), the others still draw
+            for (String id : Panels.ALL) cache.put(id, Safe.get("HUD panel: " + Panels.title(id), () -> Hud.panel(id), new Hud.Lines()));
             cacheTime = now;
         }
         List<HudEditor.Box> boxes = new ArrayList<>();

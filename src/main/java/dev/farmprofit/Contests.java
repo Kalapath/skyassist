@@ -5,11 +5,6 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -21,10 +16,12 @@ import java.util.concurrent.ConcurrentSkipListMap;
  */
 public final class Contests {
     private static final long CONTEST_MS = 20 * 60_000;
-    private static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+    private static final String NAME = "Jacob's contests";
     /** start time (ms) -> crops */
     private static final ConcurrentSkipListMap<Long, List<String>> CONTESTS = new ConcurrentSkipListMap<>();
     private static volatile long lastFetch;
+
+    static { Health.onRetry(NAME, () -> lastFetch = 0); }
 
     public static boolean loaded() { return !CONTESTS.isEmpty(); }
 
@@ -33,25 +30,23 @@ public final class Contests {
     public static void tick() {
         remind();
         String url = Config.get().jacobContestsUrl;
-        if (url == null || url.isBlank()) return;
+        if (url == null || url.isBlank()) { Health.off(NAME, "no data address in the settings"); return; }
         long now = System.currentTimeMillis();
         boolean stale = CONTESTS.isEmpty() || CONTESTS.ceilingKey(now - CONTEST_MS) == null;
-        if (now - lastFetch < (stale ? 10 * 60_000 : 60 * 60_000)) return;
+        long wait = stale ? Health.delay(NAME, 10 * 60_000L, 10 * 60_000L) : Health.delay(NAME, 60 * 60_000L, 10 * 60_000L);
+        if (now - lastFetch < wait) return;
         lastFetch = now;
-        HTTP.sendAsync(HttpRequest.newBuilder(URI.create(url)).header("User-Agent", "SkyAssist")
-                        .timeout(Duration.ofSeconds(20)).GET().build(), HttpResponse.BodyHandlers.ofString())
-                .thenAccept(r -> { if (r.statusCode() == 200) parse(r.body()); })
-                .exceptionally(e -> null);
+        Http.get(NAME, url, 20, Contests::parse);
     }
 
     /** Accepts {"contests": {"<time>": ["Wheat", ...]}} or a plain {"<time>": [...]} map; seconds or ms. */
-    private static void parse(String body) {
-        try {
-            JsonElement root = JsonParser.parseString(body);
-            JsonObject obj = root.getAsJsonObject();
-            if (obj.has("contests") && obj.get("contests").isJsonObject()) obj = obj.getAsJsonObject("contests");
-            Map<Long, List<String>> found = new TreeMap<>();
-            for (var e : obj.entrySet()) {
+    private static String parse(String body) {
+        JsonElement root = JsonParser.parseString(body);
+        JsonObject obj = root.getAsJsonObject();
+        if (obj.has("contests") && obj.get("contests").isJsonObject()) obj = obj.getAsJsonObject("contests");
+        Map<Long, List<String>> found = new TreeMap<>();
+        for (var e : obj.entrySet()) {
+            try {
                 long t;
                 try { t = Long.parseLong(e.getKey()); } catch (NumberFormatException ex) { continue; }
                 if (t < 100_000_000_000L) t *= 1000;
@@ -59,10 +54,16 @@ public final class Contests {
                 JsonArray arr = e.getValue().getAsJsonArray();
                 List<String> crops = new java.util.ArrayList<>();
                 for (JsonElement c : arr) crops.add(c.getAsString());
-                found.put(t, crops);
-            }
-            if (!found.isEmpty()) { CONTESTS.clear(); CONTESTS.putAll(found); }
-        } catch (Exception ignored) {}
+                if (!crops.isEmpty()) found.put(t, crops);
+            } catch (Exception skipThisOne) { /* one odd entry shouldn't lose the rest */ }
+        }
+        if (found.isEmpty()) throw new IllegalStateException("no contests found in the response");
+        long now = System.currentTimeMillis();
+        long upcoming = found.keySet().stream().filter(t -> t + CONTEST_MS > now).count();
+        CONTESTS.clear();
+        CONTESTS.putAll(found);
+        if (upcoming == 0) throw new IllegalStateException("the source only has past contests (" + found.size() + "), nothing upcoming yet");
+        return Health.count((int) upcoming, "upcoming contests");
     }
 
     /** "§eWheat, Carrot, Cocoa Beans §7in 12m" or "§aNOW: ... (8m left)", or null. */

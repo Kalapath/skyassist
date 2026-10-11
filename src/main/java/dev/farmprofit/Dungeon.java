@@ -108,7 +108,7 @@ public final class Dungeon {
     }
 
     private static void save() {
-        try { Files.createDirectories(Config.DIR); Files.writeString(FILE, Config.GSON.toJson(runs)); } catch (Exception ignored) {}
+        try { Files.createDirectories(Config.DIR); Config.write(FILE, Config.GSON.toJson(runs)); } catch (Exception ignored) {}
     }
 
     private static String v(Object o) { return o == null ? "§8?" : "§f" + o; }

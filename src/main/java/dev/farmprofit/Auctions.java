@@ -291,7 +291,7 @@ public final class Auctions {
     }
 
     static void save() {
-        try { Files.createDirectories(Config.DIR); Files.writeString(FILE, Config.GSON.toJson(state())); } catch (Exception ignored) {}
+        try { Files.createDirectories(Config.DIR); Config.write(FILE, Config.GSON.toJson(state())); } catch (Exception ignored) {}
     }
 
     private static void load() {

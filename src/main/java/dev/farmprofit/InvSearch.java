@@ -52,25 +52,7 @@ public final class InvSearch {
             b.setHint(Component.literal("§8Search items..."));
             b.setValue(term);
             b.setResponder(t -> term = t);
-            boolean added = false;
-            try {
-                Class<?> screens = Class.forName("net.fabricmc.fabric.api.client.screen.v1.Screens");
-                Object list = screens.getMethod("getButtons", Screen.class).invoke(null, screen);
-                ((List<Object>) list).add(b);
-                added = true;
-            } catch (Throwable ignored) {}
-            if (!added) {                                              // backup: the menu's own "add widget" method
-                for (Class<?> k = screen.getClass(); k != null && !added; k = k.getSuperclass()) {
-                    for (var m : k.getDeclaredMethods()) {
-                        if (!m.getName().equals("addRenderableWidget") || m.getParameterCount() != 1) continue;
-                        m.setAccessible(true);
-                        m.invoke(screen, b);
-                        added = true;
-                        break;
-                    }
-                }
-            }
-            if (!added) throw new IllegalStateException("couldn't add the search box");
+            if (!addWidget(screen, b)) throw new IllegalStateException("couldn't add the search box");
             box = b;
             boxScreen = screen;
             blockKeysWhileTyping(screen);               // menu events are fresh after every init, so attach each time
@@ -78,6 +60,28 @@ public final class InvSearch {
         } catch (Throwable t) {
             works = false;
         }
+    }
+
+    /** Adds a widget (button, text box) to a menu that is already set up. False if neither way worked. */
+    @SuppressWarnings("unchecked")
+    static boolean addWidget(Screen screen, Object widget) {
+        try {
+            Class<?> screens = Class.forName("net.fabricmc.fabric.api.client.screen.v1.Screens");
+            Object list = screens.getMethod("getButtons", Screen.class).invoke(null, screen);
+            ((List<Object>) list).add(widget);
+            return true;
+        } catch (Throwable ignored) {}
+        try {                                                          // backup: the menu's own "add widget" method
+            for (Class<?> k = screen.getClass(); k != null; k = k.getSuperclass()) {
+                for (var m : k.getDeclaredMethods()) {
+                    if (!m.getName().equals("addRenderableWidget") || m.getParameterCount() != 1) continue;
+                    m.setAccessible(true);
+                    m.invoke(screen, widget);
+                    return true;
+                }
+            }
+        } catch (Throwable ignored) {}
+        return false;
     }
 
     /**
@@ -95,12 +99,17 @@ public final class InvSearch {
                     if (method.getDeclaringClass() == Object.class) {
                         return switch (method.getName()) { case "hashCode" -> System.identityHashCode(p); case "equals" -> p == args[0]; default -> "SearchKeys"; };
                     }
-                    if (box == null || !box.isFocused() || args == null || args.length < 2) return true;   // not typing: keys work normally
-                    int key = keyCode(args[1]);
-                    if (key == 256) { box.setFocused(false); return false; }   // Escape: leave the search box (menu stays open)
-                    Object[] rest = java.util.Arrays.copyOfRange(args, 1, args.length);
-                    Reflect.call(box, "keyPressed", rest);               // backspace, arrows, ctrl+a ... go to the box
-                    return false;                                          // and nothing else reacts to the key
+                    try {
+                        if (box == null || !box.isFocused() || args == null || args.length < 2) return true;   // not typing: keys work normally
+                        int key = keyCode(args[1]);
+                        if (key == 256) { box.setFocused(false); return false; }   // Escape: leave the search box (menu stays open)
+                        Object[] rest = java.util.Arrays.copyOfRange(args, 1, args.length);
+                        Reflect.call(box, "keyPressed", rest);               // backspace, arrows, ctrl+a ... go to the box
+                        return false;                                          // and nothing else reacts to the key
+                    } catch (Throwable t) {
+                        Safe.report("Search box keys", t);
+                        return true;
+                    }
                 });
                 Events.register(event, proxy);
                 keysWork = true;
@@ -118,7 +127,7 @@ public final class InvSearch {
         return k instanceof Integer i ? i : -1;
     }
 
-    private static int intField(Object o, String name) {
+    static int intField(Object o, String name) {
         for (Class<?> k = o.getClass(); k != null; k = k.getSuperclass()) {
             try { Field f = k.getDeclaredField(name); f.setAccessible(true); return f.getInt(o); } catch (Exception ignored) {}
         }

@@ -1,4 +1,4 @@
-# SkyAssist (Hypixel SkyBlock, Fabric 26.1.2)
+# SkyAssist (Hypixel SkyBlock, Fabric 26.1.2 and 26.2)
 
 Tracks profit for **farming, mining, foraging, fishing and combat/slayers**, each with its own HUD.
 The HUD automatically shows whatever you did in the last minute (or the island you're on).
@@ -50,6 +50,71 @@ Open chat (**T**). While chat is open:
 ## Slayer quest costs
 Detected automatically from your purse on the sidebar when a quest starts (handles Aatrox discounts etc.).
 If you'd rather use a fixed number, set `slayerQuestCost` in the config (anything above 0 overrides auto-detection).
+
+## New in 8.13.0 — ideas from other SkyBlock mods
+I compared SkyAssist with what players like in SkyHanni, Skyblocker, Odin, Firmament, NoFrills and similar mods, and added the
+gaps that fit this mod's rule: **display only, nothing plays for you.** Every new option is in the settings, under its activity.
+- **Price alerts** (Bazaar): `/alert enchanted diamond below 1500` pings you when the price crosses your number
+  (`above` works too; add `sell` to watch what you'd get selling instead of what you'd pay buying). You get a ding, big text
+  in the middle of the screen and a chat line with an *Open in Bazaar* button (you place the order yourself). `/alerts` lists
+  them with the current price, `/alert remove <number>` and `/alert clear` tidy up. While an alert is waiting, prices refresh
+  as often as *Order check every (s)*. Settings → Bazaar → Price alerts.
+- **Pickaxe ability** (Mining): Hypixel says when you use it and when it's ready again; the cooldown shows on the Mining HUD
+  and a ready alert rings. It never uses the ability for you. Settings → Mining → Pickaxe ability.
+- **Skill XP/h** (HUD): the XP numbers Hypixel shows above your hotbar become *Farming XP: 1.2M/h · next level in 12m 30s*.
+  Settings → HUD → Main HUD → Show skill XP/h.
+- **Slayer boss kill time** (Combat): timed from when your boss appears to the kill; chat shows it with your best and average,
+  the Combat HUD keeps the last one. Saved in `slayer-times.json`. Settings → Combat → Slayer.
+- **Big on-screen alerts** (General → Alerts): one place for the large text + ding used by the alerts above; also an optional
+  **full-inventory warning** (off by default).
+- **Keep cursor between menus** (Items → Inventory, on): when SkyBlock replaces one menu with another (SkyBlock Menu → Pets…),
+  Minecraft puts the mouse pointer in the middle of the screen; this puts it back where it was. It only moves the pointer.
+- **Quick-command buttons** (Items → Inventory, off by default): small buttons beside your inventory (Pets, Wardrobe, Ender
+  Chest, Storage, Skills, SB Menu, Bazaar, Auctions; edit the list in the settings as `Name=/command; …`). A command is sent
+  only when **you click** a button, exactly like a macro key.
+- **Upgrade value in tooltips** (Items → Tooltips, on): *Upgrades ≈ 5.2M (enchants 4.1M, potato books 0.9M, gems 0.2M)* from the
+  item's own data at Bazaar prices. It is a rough extra, not a full price: reforge, stars, pets and the item itself aren't included.
+- **Yaw / pitch line** (Farming → Farming HUD, off): your exact look direction for lining up with crop rows. Display only.
+- **Works next to other mods**: duplicate detection now also knows SkyHanni's skill XP and ability alerts, and the Status page
+  lists Firmament, NoFrills and SkyOcean when they are installed.
+- **Left out on purpose**: anything that plays for you or changes how you move or what the game does (auto-requeue, auto-tip,
+  keybinds that click menu slots, macros, automatic buying / selling / flipping, hiding invisible mobs). Hypixel's mod rules
+  forbid these and SkyAssist stays display-only. Tell me about any other feature you miss from a mod you like.
+- **Not verified in game**: the chat and action-bar formats the new features read (ability messages, XP numbers, boss tags) and
+  the item data behind the upgrade value come from how Hypixel behaved when this was written. If one doesn't react, the
+  *Status → Features* page shows whether the message was ever seen, and `config/skyassist/unrecognised-messages.txt` collects
+  lines that looked relevant.
+
+## New in 8.12.0 — status page, safety net, tidy-up
+A full pass over the whole mod, aimed at "it should never crash, and when something doesn't load you should see why".
+- **Status page** (`/skyassist status`, or *Status* in the main menu; `/profit debug` opens the same page):
+  - **Data**: every online source (Bazaar, item list, lowest BIN, averages, recipes, enchants, mayor, contests, mining events,
+    quiz answers, market history, update check) with its state, how long ago it loaded, the reason if it failed
+    (no internet, rate limit, address changed, unreadable data) and a **Retry** button. *Retry failed* tries them all again.
+  - **Problems**: features that hit an error and were skipped, with how often, when, and the technical details on hover.
+  - **Features**: what the mod can see in the game (tab list, location, sidebar, particle / sound / glow hooks, menu overlay,
+    search box...) with a hint for each ✖.
+  - **About**: versions of the mod, Minecraft, Fabric and related mods. **Copy report** (also `/profit report`) puts all of it
+    on the clipboard to paste when asking for help. `/skyassist status chat` is the short version in chat.
+- **Safety net**: an error inside one feature no longer crashes the game or drops you from the server. Every HUD panel, tick
+  step, tooltip, menu, chat handler and game hook is guarded; the problem is listed on the Status page (and once in chat),
+  and everything else keeps working. A feature that fails over and over is paused for a minute, then tries again.
+- **Downloads** share one reliable helper: they retry by themselves with growing waits, keep using the last good data while a
+  source is down, and tell you which one failed and why instead of silently showing nothing.
+- **Files are saved safely**: settings, history, totals and the other data files are written in one step (a crash mid-save
+  can't leave half a file), and a file that can't be read is kept as a copy ending in `.broken` next to it (e.g. `config.json.broken`) instead of being quietly replaced by defaults.
+- **What's new** (`/skyassist news`): the notes of the latest versions, and one line in chat the first time you join after an
+  update (turn off in Settings → General → Updates).
+- **Fixes**: the update check follows the renamed `Kalapath/skyassist` repo (the old redirect was never followed, so it could
+  not find new builds), 26.2 builds with the Gradle version Loom 1.17 needs, mod icon and links in the mod list, number
+  formatting for NaN / rounding edge cases, a few settings and menu texts that had gone stale.
+
+## New in 8.11.1
+- **/market fixes**: the menu updates by itself while data loads (no more empty screen until you reopen it), waits for
+  Bazaar prices instead of giving up, no longer depends on your flip min-volume, reads more history formats (and falls back
+  to the last week if long history isn't available), works out mayor terms from election years, retries when rate-limited,
+  and says exactly what went wrong (e.g. "HTTP 400 from …") instead of showing nothing.
+- New **Movers** tab: biggest 24 h / 7 d price moves, so there's always something to see even when no signal passes the backtest.
 
 ## New in 8.11.0
 - **★ Best settings** (every /flips tab, Settings → Bazaar, or `/flips tune`): tries ~500 combinations of min item price,
@@ -462,7 +527,7 @@ Hypixel and no longer depends on the tab list's Area line. Without it, the tab l
 - Garden visitors: visitors accepted, copper (valued with `Copper value`), requested items in Spent, rewards in profit.
 - Jacob's contests on the Farming HUD (next crops + countdown; "Best now" marks a crop that's in a running contest).
   Contest data is community data from the Elite Farmers API (elitebot.dev), collected from SkyHanni users.
-- Mayor on the HUD of the activity they boost (from Hypixel's election data), and in `/farmprofit suggest`.
+- Mayor on the HUD of the activity they boost (from Hypixel's election data), and in `/profit suggest`.
 - Bazaar: warning when an order you place is far from the market (possible typo), and orders placed today in `/flips log`.
 - New activities: **Kuudra** (`/kuudraprofit`, runs per hour) and **Diana** (`/dianaprofit`, burrows per hour, coins dug).
 - Trophy fish broken down by type on the Fishing HUD.
@@ -522,21 +587,22 @@ Sweep, Magic Find...), **Powders** and **Commissions** (mining), and Forest Whis
 
 ### 1. Get the mod file built by GitHub (free, ~5 minutes)
 1. Make a free account at github.com.
-2. Click **+** (top right) → **New repository**, name it `farmprofit`, click **Create repository**.
+2. Click **+** (top right) → **New repository**, name it `skyassist`, click **Create repository**.
 3. On the next page click **uploading an existing file**. Unzip this project and drag
-   **everything inside the `farmprofit` folder** into the browser. Click **Commit changes**.
+   **everything inside the `skyassist` folder** into the browser. Click **Commit changes**.
    - On Mac, the `.github` folder is hidden. If it didn't upload: in your repo click
      **Add file → Create new file**, type `.github/workflows/build.yml` as the name,
      paste in the contents of that file, and commit.
 4. Open the **Actions** tab. A "Build mod" run starts by itself (takes ~3-5 min).
    If nothing is running, click **Build mod → Run workflow**.
 5. When it shows a green check, click the run, scroll to **Artifacts**, download
-   `farmprofit-mod`, and unzip it. Inside is `skyassist jar`.
+   `skyassist-mc26.1.2` (or `skyassist-mc26.2` for Minecraft 26.2), and unzip it. Inside is the `skyassist-….jar` file.
+   - In the mod's settings, *GitHub repo* must be your `owner/skyassist` so the update check looks at your builds.
 
 ### 2. Install
-1. Install Fabric Loader for Minecraft **26.1.2** (fabricmc.net/use/installer) — or use
-   Prism Launcher / Modrinth App and create a Fabric 26.1.2 instance.
-2. Put **Fabric API** (for 26.1.2, from Modrinth) and `skyassist jar` in your `mods` folder.
+1. Install Fabric Loader for Minecraft **26.1.2** or **26.2** (fabricmc.net/use/installer) — or use
+   Prism Launcher / Modrinth App and create a Fabric instance for that version.
+2. Put **Fabric API** (for your Minecraft version, from Modrinth) and the `skyassist-….jar` in your `mods` folder.
 3. Launch and join Hypixel.
 
 ### 3. In game
