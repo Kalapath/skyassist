@@ -88,6 +88,21 @@ public final class Timers {
         return MONTHS[month] + " " + day + ", Year " + (y[0] + 1);
     }
 
+    /** {start, end} (real seconds) of the Cult of the Fallen Star window that is running now or comes next: days 7, 14, 21, 28 of a month, 00:00-06:00 SkyBlock time (5 real minutes). */
+    static long[] cultWindow() {
+        long n = now();
+        long[] y = yearPos();
+        long monthStart = EPOCH + y[0] * YEAR + y[1] / MONTH * MONTH;
+        for (int k = 0; k < 6; k++) {
+            long ms = monthStart + (long) k * MONTH;
+            for (int d : new int[]{7, 14, 21, 28}) {
+                long start = ms + (d - 1) * DAY, end = start + DAY / 4;
+                if (n < end) return new long[]{start, end};
+            }
+        }
+        return null;
+    }
+
     public static void addHudLines(Hud.Lines out) {
         Config c = Config.get();
         if (!c.timersPanel) return;
@@ -109,18 +124,8 @@ public final class Timers {
             out.add(" §bMining event " + (ev != null ? "§f" + ev : "§8none seen §7(visit Dwarven Mines)"));
         }
         if (c.timerCult) {
-            // days 7, 14, 21, 28 of every month, 00:00-06:00 SkyBlock time (5 real minutes)
-            long[] y = yearPos();
-            long monthStart = EPOCH + y[0] * YEAR + y[1] / MONTH * MONTH;
-            String s = null;
-            for (int k = 0; k < 6 && s == null; k++) {
-                long ms = monthStart + (long) k * MONTH;
-                for (int d : new int[]{7, 14, 21, 28}) {
-                    long start = ms + (d - 1) * DAY, end = start + DAY / 4;
-                    if (n >= start && n < end) { s = "§anow §7(" + Fmt.clock((end - n) * 1000) + " left)"; break; }
-                    if (start > n) { s = "§7in §f" + Fmt.duration((start - n) * 1000); break; }
-                }
-            }
+            long[] w = cultWindow();
+            String s = w == null ? "§8unknown" : n >= w[0] ? "§anow §7(" + Fmt.clock((w[1] - n) * 1000) + " left)" : "§7in §f" + Fmt.duration((w[0] - n) * 1000);
             out.add(" §dCult of the Fallen Star " + s);
         }
         if (c.timerSpooky) out.add(" §6Spooky Festival " + yearly(8, 29, 3));

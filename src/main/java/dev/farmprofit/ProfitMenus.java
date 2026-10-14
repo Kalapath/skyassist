@@ -277,7 +277,7 @@ public final class ProfitMenus {
         List<Action> out = new ArrayList<>(List.of(
                 new Action("Refresh prices", "Gets the newest Bazaar prices.", () -> { Prices.refresh(); ref.screen.refresh(); }),
                 new Action("Flip settings", "Budget, minimum volume, tax and more.", () -> {
-                    SettingsScreen.selectSection("Bazaar", "Flip finder");
+                    SettingsScreen.selectSection("Market", "Flip finder");
                     Compat.setScreen(mc(), new SettingsScreen(ref.screen));
                 })));
         out.add(new Action("§6★ Best settings", "Tries ~500 filter combinations on today's Bazaar prices and keeps the one with the most profit for the least work "
@@ -337,7 +337,7 @@ public final class ProfitMenus {
         List<Action> top = new ArrayList<>(flipTop(ref));
         top.add(safeToggle(ref));
         top.add(ruleButton("Min item price", c.flipMinItemPrice, new String[]{"0", "0.05%", "0.1%", "0.5%", "1%"},
-                "Hide items cheaper than this, so you never buy thousands of something. Click to cycle: off, 0.05%, 0.1%, 0.5%, 1% of your budget. Exact value in Settings → Bazaar.",
+                "Hide items cheaper than this, so you never buy thousands of something. Click to cycle: off, 0.05%, 0.1%, 0.5%, 1% of your budget. Exact value in Settings → Market.",
                 v -> c.flipMinItemPrice = v, ref));
         top.add(ruleButton("Min profit/flip", c.flipMinProfit, new String[]{"0", "0.5%", "1%", "2%", "5%"},
                 "Hide flips whose whole order makes less than this. Click to cycle: off, 0.5%, 1%, 2%, 5% of your budget.",
@@ -375,14 +375,14 @@ public final class ProfitMenus {
                 + " skills read. Open each /collection category, the slayer menu and /skills to update."
                 + (CraftFlips.locked > 0 ? " Hidden as locked: " + CraftFlips.locked + "." : "")
                 + (CraftFlips.unknown > 0 ? (cc.craftHideUnknown ? " Hidden as unknown: " : " Unknown (shown with a note): ") + CraftFlips.unknown + "." : ""));
-        footer.add("§8Hover a row for the ingredients. Settings → Bazaar: min profit, min margin, budget.");
+        footer.add("§8Hover a row for the ingredients. Settings → Market: min profit, min margin, budget.");
         List<Action> top = new ArrayList<>(flipTop(ref));
         top.add(safeToggle(ref));
         top.add(new Action((cc.craftOnlyUnlocked ? "§a☑" : "§7☐") + " Only what I can craft",
                 "Hide recipes you haven't unlocked (collection / slayer / skill level). Levels come from the menus you open and level-up messages.",
                 () -> { cc.craftOnlyUnlocked = !cc.craftOnlyUnlocked; Config.save(); ref.screen.refresh(); }));
         top.add(ruleButton("Min profit/craft", cc.craftMinProfit, new String[]{"1000", "0.5%", "1%", "2%", "5%"},
-                "Each craft must make at least this. Click to cycle: 1k, 0.5%, 1%, 2%, 5% of your budget. Exact value in Settings → Bazaar.",
+                "Each craft must make at least this. Click to cycle: 1k, 0.5%, 1%, 2%, 5% of your budget. Exact value in Settings → Market.",
                 v -> cc.craftMinProfit = v, ref));
         return new Page(new String[]{"Craft", "Cost", "Sells for", "Profit", "Margin", auction ? "" : "Per hour"},
                 new int[]{140, 60, 60, 60, 45, 60}, rows, top, footer);

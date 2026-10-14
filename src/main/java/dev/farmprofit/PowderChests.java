@@ -41,6 +41,14 @@ public final class PowderChests {
         return false;
     }
 
+    /** Where the uncovered chests are, for the Crystal Hollows map: {x, z, milliseconds left}. */
+    static List<double[]> points() {
+        long life = Config.get().chestLifetimeSeconds * 1000L, now = System.currentTimeMillis();
+        List<double[]> out = new ArrayList<>();
+        for (Chest c : chests) out.add(new double[]{c.pos().getX() + 0.5, c.pos().getZ() + 0.5, life - (now - c.spawned())});
+        return out;
+    }
+
     private static boolean inHollows() {
         return Tracker.MINING.equals(Tracker.area) && Tracker.areaName != null && Tracker.areaName.contains("Hollows");
     }

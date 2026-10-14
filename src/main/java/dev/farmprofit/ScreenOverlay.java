@@ -45,6 +45,7 @@ final class ScreenOverlay {
                         if (behindWorks != Boolean.TRUE) drawBehind(args[0], args[1]);       // fallback if the background event is missing
                         Perf.run("Inventory search", () -> InvSearch.drawFront(args[0], args[1]));   // green frames around matches
                         Perf.run("Item labels", () -> ItemLabels.draw(args[0], args[1]));            // text always draws above items
+                        if (args[0] instanceof SettingsScreen) Safe.run("Test alert preview", () -> Alerts.drawOnMenu(args[1]));   // big alerts on top of the settings menu
                     }
                     return null;
                 });

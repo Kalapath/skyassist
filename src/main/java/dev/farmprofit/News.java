@@ -20,6 +20,18 @@ public final class News {
 
     /** Newest first. Keep to the last handful; CHANGELOG.md has everything. */
     private static final List<Entry> ENTRIES = List.of(
+            new Entry("8.14.1", "Profit fixes", new String[]{
+                    "Dungeon and Kuudra reward chests are counted properly: the contents (essence, enchanted books, armour, weapons, shards, pets) and the price (coins, keys) are read from the chest window when you open it and added to the run's profit once. Kuudra's Free / Paid chests work too; Kuudra keys are priced by what they cost to make (Settings → Combat → Kuudra key cost to set your own).",
+                    "Bazaar \"Order Flipped!\" no longer reads the announced profit as a price; the sell offer's price is worked out from it. A sale of more items than you bought only counts the part you bought as a flip.",
+                    "Auction flips subtract the listing fee (estimated: 1% / 2% / 2.5% for BINs by price, 5% for normal auctions). Switch: Settings → Market → Count AH listing fee.",
+                    "PET DROP! pets are priced at the rarity of the drop (Legendary Golden Dragon, not an unknown item).",
+                    "Profit per hour counts the whole time you are inside a dungeon or Kuudra's Hollow, and Diana tolerates longer gaps between burrows.",
+                    "Status page: new \"Dungeon / Kuudra chests\" line, so you can see whether chests are being picked up."}),
+            new Entry("8.14.0", "Alerts, a tidier settings menu and a Crystal Hollows map", new String[]{
+                    "Alerts for the things people usually set up alerts for: Scatha / worm spawn (with direction and distance), rare sea creatures, pet and rare drops, stash, Garden pests and visitors, finished commissions, Golden / Diamond goblins, Mineshaft found, Minos Inquisitor, your slayer boss spawning, cold, server restart and Dark Auction / Cult of the Fallen Star starting.",
+                    "Settings → Alerts lists every alert in one place, with a Test alert button that shows the real alert over the menu. Each alert also sits in its own activity tab.",
+                    "Tidier settings: 14 tabs (Market and Chat & controls replace Bazaar, Extras and Chat & sounds), settings sorted by what they do, and sub-options indented and greyed while their main switch is off.",
+                    "Crystal Hollows minimap (Settings → Mining → Crystal Hollows map): your position and facing on the 621×621 cave, the quarter you are in, Magma Fields shading, and the places and treasure chests it has learned. It only shows information; Hypixel's mod rules rule out anything that plays for you."}),
             new Entry("8.13.0", "Ideas from other SkyBlock mods", new String[]{
                     "Price alerts: /alert enchanted diamond below 1500 pings you when a Bazaar item crosses your price (/alerts lists them).",
                     "Pickaxe ability: cooldown on the Mining HUD and a ready alert.",
@@ -45,10 +57,7 @@ public final class News {
                     "The flip HUD shows your Auction House listings (sold, expired, undercut) and bids (top, outbid, won). AH buys and sales count in flip profit."}),
             new Entry("8.9.0", "Craft flips know what you can craft", new String[]{
                     "Craft flips (Bazaar and AH) respect your collections, slayer levels, Heart of the Mountain tier and skills, read from the menus and level-up messages.",
-                    "New settings: Only recipes I can craft (on), Hide when level unknown (off)."}),
-            new Entry("8.8.0", "Safe flips and tidier settings", new String[]{
-                    "Safe flips now applies to normal Bazaar flips too (/flips set safe).",
-                    "Settings reorganised into 14 tabs with section headings; min item price, min profit per flip and craft min profit take coins or a % of your budget."})
+                    "New settings: Only recipes I can craft (on), Hide when level unknown (off)."})
     );
 
     private static boolean checked;

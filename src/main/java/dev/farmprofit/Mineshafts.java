@@ -8,7 +8,7 @@ public final class Mineshafts {
         if (!Config.get().mineshaftAlert) return false;
         if (plain.contains("You found a Glacite Mineshaft portal") || plain.contains("Glacite Mineshaft portal")) {
             foundAt = System.currentTimeMillis();
-            Chat.ping();
+            Alerts.notify("mineshaft", "§b§l⛏ Mineshaft found!", "§7go in before it closes", null);
             Waypoints.offerShare("Glacite Mineshaft");
             Debug.saw("mineshaft");
             return false;                                 // keep Hypixel's own message

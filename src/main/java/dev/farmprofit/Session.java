@@ -75,11 +75,17 @@ public final class Session {
     /** Called on every action; gaps longer than the pause time don't count as farming time. */
     public void touch(long now) {
         long gap = now - lastActivity;
-        if (gap > 0 && gap <= Config.get().pauseSeconds * 1000L) activeMs += gap;
+        if (gap > 0 && gap <= pauseMs()) activeMs += gap;
         lastActivity = now;
     }
 
-    public boolean paused(long now) { return now - lastActivity > Config.get().pauseSeconds * 1000L; }
+    public boolean paused(long now) { return now - lastActivity > pauseMs(); }
+
+    /** How long a gap still counts as time spent. Burrows are further apart than crops, so Diana allows a longer one. */
+    private long pauseMs() {
+        long ms = Config.get().pauseSeconds * 1000L;
+        return isDiana() ? Math.max(ms, 90_000L) : ms;
+    }
 
     static boolean ignored(String name) { return Config.get().ignoredItems.contains(name); }
 

@@ -229,7 +229,22 @@ public final class Prices {
     /** {instasell, instabuy} before tax, or null. */
     public static double[] bazaarRaw(String id) { return BAZAAR.get(id); }
 
+    /** "Golden Dragon (Legendary pet)": how a pet drop is listed. */
+    private static final java.util.regex.Pattern PET_DROP = java.util.regex.Pattern.compile("^(.+) \\((Common|Uncommon|Rare|Epic|Legendary|Mythic) pet\\)$");
+    private static final String[] PET_TIERS = {"Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic"};
+
+    /** The lowest-BIN id of a pet drop: "Golden Dragon (Legendary pet)" -> GOLDEN_DRAGON;4. Null if this isn't one. */
+    static String petDropId(String itemName) {
+        java.util.regex.Matcher m = PET_DROP.matcher(itemName);
+        if (!m.matches()) return null;
+        for (int i = 0; i < PET_TIERS.length; i++)
+            if (PET_TIERS[i].equals(m.group(2))) return m.group(1).toUpperCase(java.util.Locale.ROOT).replace("'", "").replace(' ', '_') + ";" + i;
+        return null;
+    }
+
     public static double price(String itemName) {
+        String pet = petDropId(itemName);
+        if (pet != null) return priceForId(pet);
         double v = priceForId(idFor(itemName));
         if (v > 0 || !itemName.endsWith(" Shard")) return v;
         for (String cand : shardIds(itemName)) {

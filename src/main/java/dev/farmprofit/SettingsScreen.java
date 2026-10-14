@@ -20,12 +20,16 @@ import java.util.Map;
 /**
  * Settings menu (O key, /profit settings, or Mod Menu). Built automatically from Config:
  * anything marked @Setting appears in its tab, anything else under "Other", so new features show up by themselves.
+ * Settings that belong to an ON/OFF switch (parent) hang indented under it and are greyed while it is OFF; settings marked alert
+ * are also collected in the Alerts tab, which has a Test alert button.
  * Search box, per-setting and per-tab reset, and a Hidden items list.
  */
 public final class SettingsScreen extends Screen {
-    private static final String OTHER = "Other", HIDDEN = "Hidden items", RESULTS = "Search";
-    private static final List<String> ORDER = List.of("General", "HUD", "Farming", "Mining", "Foraging", "Fishing",
-            "Combat", "Dungeons", "Bazaar", "Items", "Chat & sounds", "Timers", "Extras", "Advanced");
+    private static final String OTHER = "Other", HIDDEN = "Hidden items", RESULTS = "Search", HUB = "Alerts";
+    private static final List<String> ORDER = List.of("General", "HUD", HUB, "Farming", "Mining", "Foraging", "Fishing",
+            "Combat", "Dungeons", "Market", "Items", "Timers", "Chat & controls", "Advanced");
+    /** A line of grey text between the rows (used at the top of the Alerts tab). */
+    private record Note(String text) {}
     private static String category;
     private static String query = "";
     private final Screen parent;
@@ -54,12 +58,77 @@ public final class SettingsScreen extends Screen {
             else map.computeIfAbsent(s.category(), k -> new ArrayList<>()).add(f);
         }
         for (List<Field> list : map.values()) list.sort(java.util.Comparator.comparingInt(SettingsScreen::orderOf));
+        // the Alerts tab: every alert from every tab, grouped by the tab it lives in (the same switches, not copies)
+        List<Field> hub = new ArrayList<>();
+        for (String c : ORDER) for (Field f : map.getOrDefault(c, List.of())) if (isAlert(f)) hub.add(f);
+        for (Map.Entry<String, List<Field>> e : map.entrySet()) {
+            if (ORDER.contains(e.getKey())) continue;
+            for (Field f : e.getValue()) if (isAlert(f)) hub.add(f);
+        }
         Map<String, List<Field>> sorted = new LinkedHashMap<>();
-        for (String c : ORDER) if (map.containsKey(c)) sorted.put(c, map.get(c));
+        for (String c : ORDER) {
+            if (c.equals(HUB)) { if (!hub.isEmpty()) sorted.put(HUB, hub); }
+            else if (map.containsKey(c)) sorted.put(c, map.get(c));
+        }
         map.forEach(sorted::putIfAbsent);
         if (!other.isEmpty()) sorted.put(OTHER, other);
         sorted.put(HIDDEN, List.of());
         return sorted;
+    }
+
+    private static boolean isAlert(Field f) {
+        Setting s = f.getAnnotation(Setting.class);
+        return s != null && s.alert();
+    }
+
+    /** Old tab names (links, saved habits) keep working. */
+    private static String canon(String tab) {
+        if (tab == null) return null;
+        return switch (tab) {
+            case "Bazaar" -> "Market";
+            case "Chat & sounds", "Extras" -> "Chat & controls";
+            default -> tab;
+        };
+    }
+
+    // ---------------- settings that hang under a switch ----------------
+
+    private static Field parentOf(Field f) {
+        Setting s = f.getAnnotation(Setting.class);
+        if (s == null || s.parent().isEmpty()) return null;
+        try { return Config.class.getField(s.parent()); } catch (Exception e) { return null; }
+    }
+
+    /** How many switches this setting hangs under (0 = none, 1 = indented once...). */
+    private static int depth(Field f) {
+        int d = 0;
+        for (Field p = parentOf(f); p != null && d < 4; p = parentOf(p)) d++;
+        return d;
+    }
+
+    /** The label of the nearest switch that is OFF above this setting, or null if all of them are on. */
+    private static String offParent(Field f) {
+        Config cfg = Config.get();
+        int guard = 0;
+        for (Field p = parentOf(f); p != null && guard++ < 4; p = parentOf(p)) {
+            try { if (p.getType() == boolean.class && !p.getBoolean(cfg)) return label(p); } catch (Exception ignored) {}
+        }
+        return null;
+    }
+
+    private static java.util.Set<String> parentNames;
+
+    /** True if other settings hang under this switch (so the menu is redrawn when it is flipped). */
+    private static boolean isParent(Field f) {
+        if (parentNames == null) {
+            java.util.Set<String> names = new java.util.HashSet<>();
+            for (Field c : Config.class.getDeclaredFields()) {
+                Setting s = c.getAnnotation(Setting.class);
+                if (s != null && !s.parent().isEmpty()) names.add(s.parent());
+            }
+            parentNames = names;
+        }
+        return parentNames.contains(f.getName());
     }
 
     private static String label(Field f) {
@@ -90,6 +159,16 @@ public final class SettingsScreen extends Screen {
     }
 
     // ---------------- layout ----------------
+
+    /**
+     * A line of text that starts at its left edge. (A StringWidget centres its text inside its box unless told otherwise, which would
+     * make the indented settings line up with nothing; this Minecraft version may not have that method, then nothing changes.)
+     */
+    private StringWidget text(int x, int y, int w, String s) {
+        StringWidget t = new StringWidget(x, y, w, 10, Component.literal(s), font);
+        Reflect.call(t, "alignLeft");
+        return t;
+    }
 
     @Override
     protected void init() {
@@ -134,8 +213,11 @@ public final class SettingsScreen extends Screen {
         if (category.equals(RESULTS)) {
             fields = new ArrayList<>();
             String q = query.toLowerCase(Locale.ROOT);
-            for (List<Field> list : cats.values()) for (Field f : list) {
-                if (label(f).toLowerCase(Locale.ROOT).contains(q) || desc(f).toLowerCase(Locale.ROOT).contains(q)) fields.add(f);
+            for (Map.Entry<String, List<Field>> e : cats.entrySet()) {
+                if (e.getKey().equals(HUB)) continue;           // the same settings are found in their own tabs
+                for (Field f : e.getValue()) {
+                    if (label(f).toLowerCase(Locale.ROOT).contains(q) || desc(f).toLowerCase(Locale.ROOT).contains(q)) fields.add(f);
+                }
             }
         } else {
             fields = cats.getOrDefault(category, List.of());
@@ -150,13 +232,13 @@ public final class SettingsScreen extends Screen {
             List<String> hidden = Config.get().ignoredItems;
             int pages = Math.max(1, (hidden.size() + perPage - 1) / perPage);
             page = Math.max(0, Math.min(page, pages - 1));
-            if (hidden.isEmpty()) addRenderableWidget(new StringWidget(left, top + 6, 340, 10,
-                    Component.literal("§7Nothing hidden. Right-click an item on the HUD (chat open) to stop counting it."), font));
+            if (hidden.isEmpty()) addRenderableWidget(text(left, top + 6, 340,
+                    "§7Nothing hidden. Right-click an item on the HUD (chat open) to stop counting it."));
             int row = 0;
             for (int i = page * perPage; i < Math.min(hidden.size(), (page + 1) * perPage); i++, row++) {
                 String item = hidden.get(i);
                 int ry = top + row * rowH;
-                addRenderableWidget(new StringWidget(left, ry + 6, labelW, 10, Component.literal(item), font));
+                addRenderableWidget(text(left, ry + 6, labelW, item));
                 addRenderableWidget(Button.builder(Component.literal("§aCount again"), b -> {
                     Config.get().ignoredItems.remove(item);
                     Config.save();
@@ -167,11 +249,13 @@ public final class SettingsScreen extends Screen {
             return;
         }
 
-        // rows: a String is a section heading, a Field a setting. A page never ends on a heading.
+        // rows: a String is a section heading, a Field a setting, a Note a line of grey text. A page never ends on a heading.
+        boolean hub = category.equals(HUB), results = category.equals(RESULTS);
         List<Object> entries = new ArrayList<>();
+        if (hub) entries.add(new Note("§7Every alert in one place. The same switches also sit in each activity's tab."));
         String lastSection = null;
         for (Field f : fields) {
-            String sec = category.equals(RESULTS) ? "" : sectionOf(f);
+            String sec = results ? "" : hub ? tabOf(f) : sectionOf(f);
             if (!sec.isEmpty() && !sec.equals(lastSection)) entries.add(sec);
             lastSection = sec;
             entries.add(f);
@@ -197,19 +281,26 @@ public final class SettingsScreen extends Screen {
             pendingSection = null;
         }
         page = Math.max(0, Math.min(page, pages - 1));
-        if (fields.isEmpty()) addRenderableWidget(new StringWidget(left, top + 6, 300, 10, Component.literal("§7No settings match."), font));
+        if (fields.isEmpty()) addRenderableWidget(text(left, top + 6, 300, "§7No settings match."));
         List<Object> shown = pagesList.isEmpty() ? List.of() : pagesList.get(page);
         int row = 0;
         for (Object e : shown) {
             int ry = top + row++ * rowH;
             if (e instanceof String sec) {
-                addRenderableWidget(new StringWidget(left, ry + 10, labelW + controlW + 34, 10, Component.literal("§e§l" + sec), font));
+                addRenderableWidget(text(left, ry + 10, labelW + controlW + 34, "§e§l" + sec));
+                continue;
+            }
+            if (e instanceof Note note) {
+                addRenderableWidget(text(left, ry + 6, labelW + controlW + 34, note.text()));
                 continue;
             }
             Field f = (Field) e;
-            String text = "  " + label(f) + (category.equals(RESULTS) ? " §8(" + tabOf(f) + (sectionOf(f).isEmpty() ? "" : " › " + sectionOf(f)) + ")" : "");
-            StringWidget lbl = new StringWidget(left, ry + 6, labelW, 10, Component.literal(text), font);
-            lbl.setTooltip(Tooltip.create(Component.literal(desc(f))));
+            // a setting that belongs to a switch sits indented under it, and is greyed while that switch is OFF
+            int indent = results ? 0 : 10 * depth(f);
+            String off = offParent(f);
+            String labelText = "  " + label(f) + (results ? " §8(" + tabOf(f) + (sectionOf(f).isEmpty() ? "" : " › " + sectionOf(f)) + ")" : "");
+            StringWidget lbl = text(left + indent, ry + 6, labelW - indent, (off == null ? "" : "§7") + labelText);
+            lbl.setTooltip(Tooltip.create(Component.literal(desc(f) + (off == null ? "" : " (Has no effect while \"" + off + "\" is OFF.)"))));
             addRenderableWidget(lbl);
             addControl(f, left + labelW + 10, ry, controlW);
             Button reset = Button.builder(Component.literal("↺"), b -> { applyPending(); resetField(f); rebuildWidgets(); })
@@ -238,7 +329,14 @@ public final class SettingsScreen extends Screen {
             resetTab.setTooltip(Tooltip.create(Component.literal("Puts every setting in this tab back to its default.")));
             addRenderableWidget(resetTab);
         }
-        if (category.equals("Bazaar")) {
+        if (category.equals(HUB)) {
+            addRenderableWidget(Button.builder(Component.literal("§aTest alert"), b -> {
+                applyPending();
+                Alerts.test();
+            }).bounds(10, by, 100, 20).build()).setTooltip(Tooltip.create(Component.literal(
+                    "Shows a sample alert with your current settings: the big text (if on), the ding (if on) and a chat line.")));
+        }
+        if (category.equals("Market")) {
             addRenderableWidget(Button.builder(Component.literal("§6★ Best settings"), b -> {
                 applyPending();
                 FlipTuner.tuneAndReport();
@@ -268,11 +366,13 @@ public final class SettingsScreen extends Screen {
         try {
             Class<?> t = f.getType();
             if (t == boolean.class) {
+                boolean switchForOthers = isParent(f);
                 Button b = Button.builder(onOff(f.getBoolean(cfg)), btn -> {
                     try {
                         f.setBoolean(cfg, !f.getBoolean(cfg));
                         btn.setMessage(onOff(f.getBoolean(cfg)));
                         Config.save();
+                        if (switchForOthers) { applyPending(); rebuildWidgets(); }    // the settings under it grey out / come back
                     } catch (Exception ignored) {}
                 }).bounds(x, y, w, 20).build();
                 b.setTooltip(tip);
@@ -301,7 +401,7 @@ public final class SettingsScreen extends Screen {
             addRenderableWidget(box);
             pending.add(() -> fromText(f, box.getValue()));
         } catch (Exception e) {
-            addRenderableWidget(new StringWidget(x, y + 6, w, 10, Component.literal("§8(edit in config.json)"), font));
+            addRenderableWidget(text(x, y + 6, w, "§8(edit in config.json)"));
         }
     }
 
@@ -388,7 +488,7 @@ public final class SettingsScreen extends Screen {
 
     public static void requestOpen() { openNextTick = true; }
 
-    public static void selectTab(String tab) { category = tab; query = ""; }
+    public static void selectTab(String tab) { category = canon(tab); query = ""; }
 
     /** Opens on the tab and page holding this setting's section heading. */
     public static void selectSection(String tab, String section) {
@@ -398,7 +498,7 @@ public final class SettingsScreen extends Screen {
 
     private static String pendingSection;
 
-    public static void requestOpen(String tab) { category = tab; query = ""; openNextTick = true; }
+    public static void requestOpen(String tab) { category = canon(tab); query = ""; openNextTick = true; }
 
     static void tick(Minecraft mc) {
         if (openNextTick && Compat.screen(mc) == null) {

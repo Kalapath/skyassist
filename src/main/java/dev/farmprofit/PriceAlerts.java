@@ -209,7 +209,7 @@ public final class PriceAlerts {
                 new Action("Clear all", "Remove every alert.", () -> { list().clear(); save(); ref[0].refresh(); }));
         List<String> footer = new ArrayList<>();
         footer.add("§8/alert <item> below|above <price> [buy|sell]  e.g. /alert enchanted diamond below 1500");
-        if (!Config.get().priceAlerts) footer.add("§eAlerts are switched off: Settings → Bazaar → Price alerts.");
+        if (!Config.get().priceAlerts) footer.add("§eAlerts are switched off: Settings → Market → Alerts → Price alerts.");
         return new Page(new String[]{"Item", "Alert when", "Now"}, new int[]{170, 170, 60}, rows, top, footer);
     }
 

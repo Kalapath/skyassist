@@ -26,4 +26,11 @@ public @interface Setting {
     String section() default "";
     /** Position in the menu (lower = higher up). */
     int order() default 100000;
+    /**
+     * Name of the ON/OFF setting this one belongs to (e.g. "Items shown" belongs to "Show item list"). It is drawn indented under it
+     * and greyed out while that switch is OFF.
+     */
+    String parent() default "";
+    /** An alert: also listed together with all the others in the Alerts tab. */
+    boolean alert() default false;
 }

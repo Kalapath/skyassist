@@ -159,6 +159,9 @@ public final class Tracker {
 
     public static Session miningSession() { return activity(MINING); }
 
+    /** The Dungeons / Kuudra session a reward chest belongs to (started if it isn't running yet). */
+    static Session chestSession(String type) { return activity(type); }
+
     /** Things you can hit that aren't fights: NPCs, players, decorations. */
     private static final Set<String> NOT_MOBS = Set.of("player", "armor_stand", "villager", "wandering_trader",
             "item_frame", "glow_item_frame", "painting", "interaction", "text_display", "item_display", "block_display",
@@ -326,7 +329,15 @@ public final class Tracker {
 
         if (now - lastTabCheck > 1000) {
             lastTabCheck = now;
-            Safe.run("Tab list", () -> readTab(mc));
+            Safe.run("Tab list", () -> {
+                readTab(mc);
+                // Time inside a dungeon / Kuudra counts as run time, not only the seconds you swing a weapon: waiting for the
+                // party, clearing rooms quietly, boss cutscenes and the chests are all part of the run (and of its profit per hour).
+                for (String t : new String[]{DUNGEONS, KUUDRA}) {
+                    Session s = sessions.get(t);
+                    if (s != null && t.equals(area)) s.touch(now);
+                }
+            });
         }
 
         Perf.run("Mining/foraging blocks", () -> trackBlocks(mc));
@@ -352,6 +363,8 @@ public final class Tracker {
         Perf.run("Calculator", () -> Calc.tick(mc));
         Perf.run("Price alerts", () -> PriceAlerts.tick(mc));
         Perf.run("Big alerts", () -> Alerts.tick(mc));
+        Perf.run("Event alerts", () -> EventAlerts.tick(mc));
+        Perf.run("Crystal Hollows map", () -> CrystalMap.tick(mc));
         Perf.run("Keep cursor", () -> CursorKeeper.tick(mc));
 
         if (now - lastScoreboardCheck > 500) {
@@ -362,6 +375,7 @@ public final class Tracker {
             });
         }
 
+        Perf.run("Reward chests", () -> RewardChest.tick(mc));
         Perf.run("Inventory tracking", () -> trackInventory(mc));
     }
 
@@ -376,8 +390,12 @@ public final class Tracker {
         boolean inMenu = Compat.screen(mc) != null;
         boolean menuOk = Menus.countsIn(mc);
         if (inMenu && Menus.isVisitorMenu()) target = sessions.get(FARMING);
+        // A dungeon / Kuudra reward chest is counted from its window when it opens (see RewardChest): its items arriving in the
+        // inventory must not be counted a second time, and what it uses up (Kismet...) belongs to the dungeon, not to farming.
+        boolean chest = RewardChest.active();
+        if (chest) target = RewardChest.session();
         boolean counting = haveSnapshot && target != null && menuOk
-                && (inMenu || idleMs(target) < INVENTORY_WINDOW_MS);
+                && (inMenu || chest || idleMs(target) < INVENTORY_WINDOW_MS);
         if (counting) {
             Set<String> keys = new HashSet<>(inv.keySet());
             keys.addAll(lastInventory.keySet());
@@ -391,6 +409,7 @@ public final class Tracker {
             // Something gained in the same tick (compactor, crafting): treat as a conversion, keep it net.
             // Only losses: you used it up (potion, arrows, a visitor's request) -> "Spent".
             for (var d : deltas.entrySet()) {
+                if (chest && (d.getValue() > 0 || RewardChest.isKey(d.getKey()))) continue;     // counted from the chest window / part of its price
                 boolean lootMenu = inMenu && menuOk;          // visitor rewards, dungeon / Croesus chests: real loot
                 if (d.getValue() > 0 && !lootMenu && !anyLoss(deltas) && !Attribution.counts(target, d.getKey(), Config.get().attributionSeconds * 1000L)) continue;  // not from this activity
                 if (anyGain || d.getValue() > 0) target.addItem(d.getKey(), d.getValue());
@@ -399,7 +418,6 @@ public final class Tracker {
                 else if (Items.isTracked(d.getKey())) { target.addItem(d.getKey(), d.getValue()); Attribution.usedUpAt = System.currentTimeMillis(); }
                 else target.addSpent(d.getKey(), -d.getValue());
             }
-            if (anyGain && inMenu) Menus.onGainedInMenu(target);
         }
         lastInventory = inv;
         haveSnapshot = true;
@@ -674,6 +692,8 @@ public final class Tracker {
             return;
         }
         Mineshafts.onChat(plain);
+        Safe.run("Crystal Hollows places", () -> CrystalMap.onChat(plain));
+        if (Safe.test("Alert messages", () -> EventAlerts.onChat(plain), false)) return;
         if (Safe.test("Pickaxe ability", () -> AbilityAlert.onChat(plain), false)) return;
         if (Bazaar.handle(plain)) return;
         if (Auctions.onChat(plain)) return;
@@ -802,7 +822,7 @@ public final class Tracker {
         if (rd.matches()) {
             Debug.saw("rare drop");
             Session s = shown();
-            if (s != null) addRare(s, rd.group(2));
+            if (s != null) addRare(s, rd.group(2), rd.group(1).startsWith("PET") ? message : null);
             return;
         }
 
@@ -836,7 +856,16 @@ public final class Tracker {
         }
     }
 
-    private static void addRare(Session s, String raw) {
+    private static void addRare(Session s, String raw) { addRare(s, raw, null); }
+
+    private static final String[] PET_RARITY = {"Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic"};
+
+    /**
+     * @param petMessage the chat message of a PET DROP!, or null: a pet is worth what its rarity says (a Legendary Golden Dragon is
+     *                   not an Epic one), and the rarity is only in the colour of the name, so it is read from the message.
+     *                   The drop is then listed as "Golden Dragon (Legendary pet)", which Prices knows how to price.
+     */
+    private static void addRare(Session s, String raw, Component petMessage) {
         String item = raw.replaceAll("^[^A-Za-z0-9\\[]+", "").trim();
         while (item.matches(".*\\([^()]*\\)\\s*$") && !item.startsWith("Enchanted Book (")) {
             item = item.replaceAll("\\s*\\([^()]*\\)\\s*$", "");
@@ -849,7 +878,42 @@ public final class Tracker {
         if (a.matches()) { item = a.group(1).trim(); count = Integer.parseInt(a.group(2)); }
         Matcher b = AMOUNT_PREFIX.matcher(item);
         if (b.matches()) { item = b.group(2).trim(); count = Integer.parseInt(b.group(1)); }
+        if (petMessage != null && !item.isEmpty()) {
+            int tier = nameTier(petMessage, item);
+            if (tier >= 0) item = item + " (" + PET_RARITY[tier] + " pet)";
+        }
         if (!item.isEmpty() && !item.endsWith(" Shard")) { s.rareDrops.merge(item, count, Integer::sum); s.noteDrop(item); }
+    }
+
+    /** Rarity (0 common .. 5 mythic) from the colour the message gives to this name, or -1. */
+    private static int nameTier(Component message, String name) {
+        int[] found = {-1};
+        tierWalk(message, null, name, found);
+        return found[0];
+    }
+
+    private static void tierWalk(Component c, Integer inherited, String name, int[] found) {
+        if (found[0] >= 0) return;
+        Integer colour = inherited;
+        Object tc = Reflect.call(Reflect.call(c, "getStyle"), "getColor");          // (looked up by name: Style / TextColor have been reshaped before)
+        if (tc instanceof java.util.Optional<?> opt) tc = opt.orElse(null);
+        Object rgb = tc == null || tc == Reflect.FAIL ? null : Reflect.call(tc, new String[]{"getValue", "value"});
+        if (rgb instanceof Integer i) colour = i;
+        Object copy = Reflect.call(c, new String[]{"plainCopy", "copy"});   // this piece of text alone, without its siblings
+        String own = copy instanceof Component cc ? strip(cc.getString()) : "";
+        if (colour != null && own.contains(name)) {
+            switch (colour) {
+                case 0xFFFFFF -> found[0] = 0;
+                case 0x55FF55 -> found[0] = 1;
+                case 0x5555FF -> found[0] = 2;
+                case 0xAA00AA -> found[0] = 3;
+                case 0xFFAA00 -> found[0] = 4;
+                case 0xFF55FF -> found[0] = 5;
+                default -> { }
+            }
+            if (found[0] >= 0) return;
+        }
+        for (Component sibling : c.getSiblings()) tierWalk(sibling, colour, name, found);
     }
 
     private static void scanShards(String text) {

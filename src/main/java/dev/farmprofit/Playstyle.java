@@ -8,15 +8,16 @@ import java.util.Map;
 public final class Playstyle {
     public static final Map<String, List<String>> GROUPS = new LinkedHashMap<>();
     static {
-        GROUPS.put("Farming", List.of("showFarmingHud", "pestHighlight", "greenhouseGuide", "contestAlert", "showContests"));
-        GROUPS.put("Mining", List.of("showMiningHud", "powderChests", "lockpickHelper", "glowGhosts", "glowCommission"));
+        GROUPS.put("Farming", List.of("showFarmingHud", "pestHighlight", "greenhouseGuide", "contestAlert", "showContests", "pestAlert"));
+        GROUPS.put("Mining", List.of("showMiningHud", "powderChests", "crystalMap", "lockpickHelper", "glowGhosts", "glowCommission",
+                "scathaAlert", "glowScatha", "commissionAlert", "goblinAlert", "coldAlert"));
         GROUPS.put("Foraging", List.of("showForagingHud"));
-        GROUPS.put("Fishing", List.of("showFishingHud", "fishingAlert", "glowSeaCreatures"));
-        GROUPS.put("Combat", List.of("showCombatHud", "glowSlayer", "glowZealots"));
+        GROUPS.put("Fishing", List.of("showFishingHud", "fishingAlert", "glowSeaCreatures", "seaCreatureAlert"));
+        GROUPS.put("Combat", List.of("showCombatHud", "glowSlayer", "glowZealots", "slayerSpawnAlert"));
         GROUPS.put("Dungeons", List.of("showDungeonsHud", "secretFinder", "chestProfit", "glowStarred", "glowKeys", "glowBats",
                 "solveWeirdos", "solveBlaze", "solveTerminals", "solveIceFill", "solveCreeper", "solveTeleport", "solveTicTacToe", "solveQuiz", "solveMelody"));
         GROUPS.put("Kuudra", List.of("showKuudraHud"));
-        GROUPS.put("Diana", List.of("showDianaHud", "dianaHelper", "glowInquisitor"));
+        GROUPS.put("Diana", List.of("showDianaHud", "dianaHelper", "glowInquisitor", "inquisitorAlert"));
         GROUPS.put("Bazaar", List.of("bazaarHud", "auctionHud"));
     }
 

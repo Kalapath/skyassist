@@ -413,7 +413,7 @@ public final class MarketSignals {
         }), new Action("Recalculate", "Recompute from the downloaded data (e.g. after the election leader changed).", () -> { signals = compute(); ref[0].refresh(); }));
         if (rows.isEmpty()) rows.add(new Row(running ? "§eLoading… §7" + status : HISTORY.isEmpty()
                 ? "§cNo price history yet. §7" + status
-                : "§7No " + kind.toLowerCase(Locale.ROOT) + " signal passed the backtest right now. §8See the Movers tab, or lower the minimums in Settings → Bazaar → Market signals."));
+                : "§7No " + kind.toLowerCase(Locale.ROOT) + " signal passed the backtest right now. §8See the Movers tab, or lower the minimums in Settings → Market → Market signals."));
         List<String> footer = new ArrayList<>();
         footer.add("§7Status: " + status + (running ? " §8(updates by itself)" : ""));
         if (status.startsWith("§c")) footer.add("§8Why it failed, and a Retry button: /skyassist status (Data tab).");
@@ -468,7 +468,7 @@ public final class MarketSignals {
         };
         List<Row> rows = new ArrayList<>();
         for (String[] l : lines) rows.add(new Row(l[0], "§7" + l[1]));
-        return new Page(new String[]{"", ""}, new int[]{90, 360}, rows, List.of(), List.of("§8Settings → Bazaar → Market signals: items analysed, history length, minimum samples / move / hit rate."));
+        return new Page(new String[]{"", ""}, new int[]{90, 360}, rows, List.of(), List.of("§8Settings → Market → Market signals: items analysed, history length, minimum samples / move / hit rate."));
     }
 
     public static String status() { return status; }

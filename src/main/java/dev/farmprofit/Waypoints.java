@@ -48,12 +48,23 @@ public final class Waypoints {
         boolean inq = rest.toLowerCase(Locale.ROOT).contains("inquis");
         add(label, Integer.parseInt(m.group(1)), Integer.parseInt(m.group(2)), Integer.parseInt(m.group(3)),
                 inq ? 0xFFAA00 : 0x55FFFF, Config.get().waypointSeconds * 1000L, null);
+        final String shared = rest;
+        final double sx = Integer.parseInt(m.group(1)) + 0.5, sz = Integer.parseInt(m.group(3)) + 0.5;
+        Safe.run("Crystal Hollows places", () -> CrystalMap.onShared(shared, sx, sz));          // "x: y: z: | Jungle Temple" fills the map
         if (inq) Chat.ping();
     }
 
     public static void add(String label, double x, double y, double z, int color, long lifeMs, String server) {
         points.removeIf(p -> Math.abs(p.x() - x) < 2 && Math.abs(p.z() - z) < 2);
         points.add(new Point(label, x, y, z, lifeMs <= 0 ? Long.MAX_VALUE : System.currentTimeMillis() + lifeMs, color, server));
+    }
+
+    /** The waypoints that are active right now (the Crystal Hollows map draws the ones from party chat). */
+    static List<Point> active() {
+        String srv = server();
+        List<Point> out = new ArrayList<>();
+        for (Point p : points) if (p.server() == null || p.server().equals(srv)) out.add(p);
+        return out;
     }
 
     /** Clickable "[Share with party]" line. */
