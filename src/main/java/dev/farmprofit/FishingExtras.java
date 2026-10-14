@@ -59,8 +59,9 @@ public final class FishingExtras {
                 String name = m.group(1).trim();
                 mine.add(new Creature(t.getId(), name, now));
                 if (RARE.stream().anyMatch(name::contains)) {
-                    Chat.ping();
-                    Tracker.say("§b§l[Fishing] RARE: §f§l" + name + "§b§l!");
+                    // the big alert is the "Rare sea creature alert" setting (same key as the one read from Hypixel's message, so you get one, not two)
+                    if (Config.get().seaCreatureAlert) Alerts.notify("sea-" + name, "§b§l≈ " + name + "!", "§7rare sea creature", null);
+                    else { Chat.ping(); Tracker.say("§b§l[Fishing] RARE: §f§l" + name + "§b§l!"); }
                     Waypoints.offerShare(name);
                 }
             }

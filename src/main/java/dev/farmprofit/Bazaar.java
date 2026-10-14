@@ -83,6 +83,14 @@ public final class Bazaar {
 
     // ================= chat =================
 
+    /** The ding (Ding when an order fills) and, if switched on, a big alert for a filled order. */
+    private static void fillAlert(String what, String qty, String name) {
+        Config c = Config.get();
+        boolean rang = c.bzFillSound && c.bzSound;
+        if (c.bzFillAlert) Alerts.notify("bz-fill-" + name, "§a§l" + what, "§f" + qty + "x " + name, null, !rang);
+        if (c.bzFillSound) ping();
+    }
+
     /** Returns true if the message was a [Bazaar] message we handled. */
     public static boolean handle(String msg) {
         if (!msg.startsWith("[Bazaar]")) return false;
@@ -102,13 +110,13 @@ public final class Bazaar {
         if ((m = FILLED_BUY.matcher(msg)).find()) {
             Order o = find("buy", m.group(2).trim(), x -> !x.filled);
             if (o != null) o.filled = true;
-            if (Config.get().bzFillSound) ping();
+            fillAlert("Buy order filled", m.group(1), m.group(2).trim());
             save(); return true;
         }
         if ((m = FILLED_SELL.matcher(msg)).find()) {
             Order o = find("sell", m.group(2).trim(), x -> !x.filled);
             if (o != null) o.filled = true;
-            if (Config.get().bzFillSound) ping();
+            fillAlert("Sell offer filled", m.group(1), m.group(2).trim());
             save(); return true;
         }
         if ((m = CLAIM_BUY.matcher(msg)).find()) {
@@ -162,20 +170,55 @@ public final class Bazaar {
             save(); return true;
         }
         if ((m = FLIPPED.matcher(msg)).find()) {
+            // "Order Flipped! 5x Coal for 13.0 coins of total expected profit." - the number is the PROFIT, not the price
             int qty = (int) num(m.group(1));
             String name = m.group(2).trim();
-            double total = num(m.group(3));
-            Order b = find("buy", name, x -> true);
+            double profit = num(m.group(3));
+            double market = marketSell(name);
+            Order b = flippedBuy(name, qty, profit, market);
+            double sellEach = flipSellPrice(b == null ? 0 : b.price, qty, profit, market, tax());
             if (b != null) {
                 Lot lot = new Lot(); lot.name = name; lot.qty = qty; lot.cost = b.price;
                 st.lots.add(lot);
                 b.claimed += qty;
                 if (b.claimed >= b.qty) st.orders.remove(b);
             }
-            addOrder("sell", name, qty, round1(total / Math.max(1, qty)));
+            if (sellEach > 0) addOrder("sell", name, qty, sellEach);
             save(); return true;
         }
         return true;   // other [Bazaar] messages: nothing to do
+    }
+
+    /** The price a new sell offer for this item would get now (lowest offer minus 0.1), or 0 if the market isn't known. */
+    private static double marketSell(String name) {
+        double[] b = Prices.BOOK.get(Prices.idFor(name));
+        return b != null && b[1] > 0 ? round1(b[1] - 0.1) : 0;
+    }
+
+    /**
+     * The buy order a "Flip Order" belongs to. With a known market price the right one is the order whose price makes
+     * the announced profit add up; otherwise the first order for that item.
+     */
+    private static Order flippedBuy(String name, int qty, double profit, double market) {
+        Order best = null;
+        double bestGap = Double.MAX_VALUE;
+        for (Order o : state().orders) {
+            if (!o.type.equals("buy") || !o.name.equalsIgnoreCase(name)) continue;
+            double gap = market > 0 ? Math.abs(flipSellPrice(o.price, qty, profit, 0, tax()) - market) : 0;
+            if (best == null || gap < bestGap) { best = o; bestGap = gap; }
+        }
+        return best;
+    }
+
+    /**
+     * The sell offer's price per item. Hypixel announces the profit it expects: sale after tax minus what the items cost, so
+     * price = (profit / qty + buy price) / (1 - tax). If that is far from today's market (the wrong buy order was matched),
+     * the market price is used instead; with neither known the result is 0 (no offer is added).
+     */
+    static double flipSellPrice(double buyEach, int qty, double profit, double market, double tax) {
+        double derived = buyEach > 0 && qty > 0 ? round1((profit / qty + buyEach) / Math.max(0.01, 1 - tax)) : 0;
+        if (derived > 0 && (market <= 0 || Math.abs(derived - market) <= Math.max(1, market * 0.05))) return derived;
+        return market > 0 ? market : derived;
     }
 
     private static void addOrder(String type, String name, int qty, double price) {
@@ -197,24 +240,43 @@ public final class Bazaar {
      * bought (some of) its ingredients = craft flip: cost from your bought ingredients (2 levels deep), anything you
      * didn't buy priced at today's instant-buy price.
      */
-    private static void logSale(String name, int qty, double coins, double sellEach) {
+    private static void logSale(String name, int qty, double coins, double sellEach) { logSale(name, qty, coins, sellEach, 0); }
+
+    /** fee: the Auction House listing fee already taken off coins (only used to say so in the chat line). */
+    private static void logSale(String name, int qty, double coins, double sellEach, double fee) {
         State st = state();
         double[] same = takeLots(name, qty);
         double cost;
+        int covered = qty;                                                  // how many of the sold items you can show a purchase for
         boolean craft = false;
         if (same[1] >= qty) cost = same[0];
         else {
             double[] c = craftCost(name, qty - (int) same[1], 2);
-            if (c[1] <= 0 && same[1] == 0) return;                          // nothing you bought went into this: not a flip
-            cost = same[0] + c[0];
-            craft = c[1] > 0;
+            if (c[1] <= 0) {
+                if (same[1] == 0) return;                                   // nothing you bought went into this: not a flip
+                covered = (int) same[1];                                    // only part of the sale was bought: only that part is a flip
+                cost = same[0];                                             // (the rest came from somewhere else; its revenue isn't profit of a flip)
+            } else {
+                cost = same[0] + c[0];
+                craft = true;
+            }
         }
+        double revenue = coins * covered / Math.max(1, qty);
         Entry e = new Entry();
-        e.time = System.currentTimeMillis(); e.name = name; e.qty = qty; e.craft = craft;
-        e.buy = cost / Math.max(1, qty); e.sell = sellEach; e.profit = coins - cost;
+        e.time = System.currentTimeMillis(); e.name = name; e.qty = covered; e.craft = craft;
+        e.buy = cost / Math.max(1, covered); e.sell = sellEach; e.profit = revenue - cost;
         st.log.add(0, e);
         while (st.log.size() > 1000) st.log.remove(st.log.size() - 1);
-        Tracker.say("§6[Flips] §7Sold §f" + qty + "x " + name + (craft ? " §8(craft flip)" : "") + " §7profit " + (e.profit >= 0 ? "§a+" : "§c") + Fmt.coins(e.profit));
+        Tracker.say("§6[Flips] §7Sold §f" + covered + "x " + name + (craft ? " §8(craft flip)" : "") + " §7profit " + (e.profit >= 0 ? "§a+" : "§c") + Fmt.coins(e.profit)
+                + (fee > 0 ? " §8(after the ~" + Fmt.coins(fee * covered / Math.max(1, qty)) + " listing fee)" : "")
+                + (covered < qty ? " §8(only " + covered + " of the " + qty + " sold were bought by you)" : ""));
+    }
+
+    /** The fee Hypixel took when an auction was listed, estimated from its price (the duration fee, a few hundred coins, is not included). */
+    static double listingFee(boolean bin, double price) {
+        if (price <= 0) return 0;
+        if (!bin) return price * 0.05;
+        return price * (price > 100_000_000 ? 0.025 : price >= 10_000_000 ? 0.02 : 0.01);
     }
 
     /** Takes up to qty items out of your bought lots: {total cost, how many were found}. */
@@ -480,8 +542,12 @@ public final class Bazaar {
     }
 
     /** Coins collected from an Auction House sale. */
-    static void logAuctionSale(String name, int qty, double coins) {
-        logSale(name, qty, coins, coins / Math.max(1, qty));
+    static void logAuctionSale(String name, int qty, double coins) { logAuctionSale(name, qty, coins, 0); }
+
+    /** fee: what listing it cost (estimated); the profit of the flip is what you collected minus that minus what you paid. */
+    static void logAuctionSale(String name, int qty, double coins, double fee) {
+        fee = Math.max(0, Math.min(fee, coins));
+        logSale(name, qty, coins - fee, (coins - fee) / Math.max(1, qty), fee);
         traded(coins);
         save();
     }

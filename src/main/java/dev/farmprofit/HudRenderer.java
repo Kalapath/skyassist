@@ -48,14 +48,21 @@ final class HudRenderer {
                 w = Math.max(w, mc.font.width(l.text()) + (icon ? 11 : 0));
             }
             int h = lines.size() * lh;
+            if (id.equals("crystalmap")) w = Math.max(w, CrystalMap.size());
             if (id.equals("greenhouse")) {
                 Greenhouse.Grid g = Greenhouse.grid();
                 if (g != null) { w = Math.max(w, g.size() * CELL_W); h += g.size() * CELL_H + 4; }
             }
+            if (id.equals("crystalmap") && pos.x < 0) {         // not placed by you yet: top right corner
+                x = Math.max(5, mc.getWindow().getGuiScaledWidth() - Math.round((w + 3) * scale) - 6);
+                if (pos.y < 0) y = 6;
+            }
             HudEditor.Box box = new HudEditor.Box(id, key, lines, x, y, w, h, lh, scale, pos.hidden);
             boxes.add(box);
-            nextX = x;
-            nextY = y + Math.round((box.h() + 10) * scale);
+            if (!id.equals("crystalmap")) {                     // (the map has its own corner: the panels after it stack as before)
+                nextX = x;
+                nextY = y + Math.round((box.h() + 10) * scale);
+            }
         }
         return boxes;
     }

@@ -84,8 +84,9 @@ public final class Contests {
         Long next = CONTESTS.ceilingKey(now);
         if (next == null || next == remindedFor || next - now > 60_000) return;
         remindedFor = next;
-        Chat.ping();
-        Tracker.say("§6[Farming] §eJacob's contest in " + Fmt.clock(next - now) + ": §f" + String.join(", ", CONTESTS.get(next)));
+        String crops = String.join(", ", CONTESTS.get(next));
+        Alerts.notify("contest", "§6§lJacob's contest soon", "§f" + crops + " §7in " + Fmt.clock(next - now),
+                "§6[Farming] §eJacob's contest in " + Fmt.clock(next - now) + ": §f" + crops);
     }
 
     /** While you're in a contest: the sidebar's contest lines (crop, time left, collected, medal / bracket). */

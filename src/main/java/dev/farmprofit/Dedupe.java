@@ -23,12 +23,21 @@ public final class Dedupe {
         boolean routes = loaded("secretroutes", "secret-routes", "secret_routes");
         if (skyblocker) out.add(new Overlap("priceTooltips", "Price tooltips", "Skyblocker"));
         if (skyblocker) out.add(new Overlap("chestProfit", "Dungeon chest profit", "Skyblocker (Croesus helper)"));
+        if (skyblocker) out.add(new Overlap("crystalMap", "Crystal Hollows minimap", "Skyblocker (Crystals HUD)"));
         if (skyblocker || odin || routes) out.add(new Overlap("secretFinder", "Dungeon secret finder",
                 skyblocker ? "Skyblocker" : odin ? "Odin" : "Secret Routes"));
         if (skyhanni) out.add(new Overlap("contestAlert", "Jacob's contest reminder", "SkyHanni"));
         if (skyhanni) out.add(new Overlap("enchantColors", "Enchantment colors", "SkyHanni"));
         if (skyhanni) out.add(new Overlap("skillXpHud", "Skill XP/h line", "SkyHanni"));
         if (skyhanni) out.add(new Overlap("abilityAlert", "Pickaxe ability ready alert", "SkyHanni"));
+        if (skyhanni) out.add(new Overlap("mineshaftAlert", "Mineshaft alert", "SkyHanni"));
+        if (skyhanni) out.add(new Overlap("goblinAlert", "Golden / Diamond goblin alert", "SkyHanni"));
+        if (skyhanni) out.add(new Overlap("coldAlert", "Cold alert", "SkyHanni"));
+        if (skyhanni) out.add(new Overlap("stashAlert", "Stash alert", "SkyHanni"));
+        if (skyhanni) out.add(new Overlap("pestAlert", "Pest spawned alert", "SkyHanni"));
+        if (skyhanni) out.add(new Overlap("visitorAlert", "Visitor arrived alert", "SkyHanni"));
+        if (skyhanni) out.add(new Overlap("seaCreatureAlert", "Rare sea creature alert", "SkyHanni"));
+        if (skyhanni) out.add(new Overlap("restartAlert", "Server restart alert", "SkyHanni"));
         if (skyblocker || odin) {
             String who = skyblocker ? "Skyblocker" : "Odin";
             out.add(new Overlap("solveWeirdos", "Three Weirdos solver", who));

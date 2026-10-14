@@ -34,7 +34,8 @@ public final class Auctions {
     public static final class Listing {
         public String name;
         public int qty = 1;
-        public double price;              // BIN price, or top/starting bid
+        public double price;              // BIN price, or top/starting bid (after a sale: what it sold for)
+        public double listed;             // the price it was listed at (its listing fee is based on that)
         public boolean bin;
         public long created, endsAt;      // endsAt 0 = unknown
         public String status = "active";  // active / sold / expired
@@ -86,14 +87,17 @@ public final class Auctions {
             l.name = m.group(3).trim();
             l.created = now;
             if (now - pendingTime < 120_000) l.price = pendingPrice;
+            l.listed = l.price;
             st.listings.add(l);
             save(); return true;
         }
         if ((m = SOLD.matcher(msg)).find()) {
             Listing l = findListing(m.group(3).trim(), "active");
-            if (l != null) { l.status = "sold"; l.buyer = m.group(1); l.price = num(m.group(4)); }
+            if (l != null) { l.status = "sold"; l.buyer = m.group(1); if (l.listed <= 0) l.listed = num(m.group(4)); l.price = num(m.group(4)); }
             Tracker.say("§6[Flips] §a" + m.group(3).trim() + " sold for " + Fmt.coins(num(m.group(4))) + " §7- claim it in /ah.");
             Bazaar.ping();
+            if (Config.get().auctionAlert) Alerts.notify("ah-sold-" + m.group(3).trim(), "§6§lAuction sold!",
+                    "§f" + m.group(3).trim() + " §7for §6" + Fmt.coins(num(m.group(4))), null, !Config.get().bzSound);
             save(); return true;
         }
         if ((m = COLLECTED.matcher(msg)).find()) {
@@ -103,7 +107,9 @@ public final class Auctions {
             Listing l = findListing(name, "sold");
             if (l == null) l = findListing(name, "active");
             if (l != null) st.listings.remove(l);
-            Bazaar.logAuctionSale(name, qty, coins);
+            double fee = 0;                                                  // what listing it cost (the claim tax is already off the coins)
+            if (Config.get().ahFee) fee = l != null ? Bazaar.listingFee(l.bin, l.listed > 0 ? l.listed : l.price) : Bazaar.listingFee(true, coins >= 990_000 ? coins / 0.99 : coins);
+            Bazaar.logAuctionSale(name, qty, coins, fee);
             save(); return true;
         }
         if ((m = BID.matcher(msg)).find()) {
@@ -119,6 +125,8 @@ public final class Auctions {
             Bid b = findBid(m.group(4).trim());
             if (b != null) b.status = "outbid";
             Bazaar.ping();
+            if (Config.get().auctionAlert) Alerts.notify("ah-outbid-" + m.group(4).trim(), "§c§lOutbid!",
+                    "§f" + m.group(4).trim() + " §7by §c" + Fmt.coins(num(m.group(2))), null, !Config.get().bzSound);
             save(); return true;
         }
         if ((m = CLAIMED.matcher(msg)).find()) {

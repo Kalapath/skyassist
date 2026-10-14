@@ -10,7 +10,7 @@ import java.util.Map;
 /**
  * Big on-screen alerts: large text in the middle of the screen for a few seconds (plus a ding and a chat line) for things you
  * shouldn't miss: pickaxe ability ready, a price alert, a full inventory. Everything in the mod that wants your attention goes
- * through {@link #notify}, so the look and the two switches (Settings → General → Alerts) are in one place.
+ * through {@link #notify}, so the look and the two switches (Settings → Alerts) are in one place.
  * Display only: an alert never does anything in the game.
  */
 public final class Alerts {
@@ -28,7 +28,10 @@ public final class Alerts {
      * @param sub   smaller text under it, or null
      * @param chat  a chat line to print as well, or null
      */
-    static synchronized void notify(String key, String title, String sub, Object chat) {
+    static synchronized void notify(String key, String title, String sub, Object chat) { notify(key, title, sub, chat, true); }
+
+    /** Same, with `ding` false when the caller already rang a sound of its own (the ding is still subject to the global switch). */
+    static synchronized void notify(String key, String title, String sub, Object chat, boolean ding) {
         long now = System.currentTimeMillis();
         Long prev = LAST.get(key);
         if (prev != null && now - prev < 2000) return;
@@ -40,16 +43,28 @@ public final class Alerts {
             SHOWN.add(0, new Shown(title, sub, now));
             while (SHOWN.size() > 3) SHOWN.remove(SHOWN.size() - 1);
         }
-        if (c.alertSound) Chat.ping();
+        if (ding && c.alertSound) Chat.ping();
+    }
+
+    /** Settings → Alerts → Test alert: shows what an alert looks and sounds like. */
+    static void test() {
+        notify("test", "§a§lTest alert", "§7this is how alerts look and sound",
+                "§6[SkyAssist] §7Test alert: this is what an alert's chat line looks like.");
     }
 
     /** Called by the HUD every frame. */
-    static synchronized void draw(Object graphics) {
+    static synchronized void draw(Object graphics) { draw(graphics, false); }
+
+    /** Called on top of the settings menu (which blurs whatever is behind it), so the Test alert button can be seen working. */
+    static synchronized void drawOnMenu(Object graphics) { draw(graphics, true); }
+
+    private static void draw(Object graphics, boolean onMenu) {
         if (SHOWN.isEmpty()) return;
         Minecraft mc = Minecraft.getInstance();
+        if (!onMenu && ScreenOverlay.works == Boolean.TRUE && Compat.screen(mc) instanceof SettingsScreen) return;     // drawn over the menu instead
         long now = System.currentTimeMillis();
         SHOWN.removeIf(a -> now - a.start() > LIFE_MS);
-        if (SHOWN.isEmpty() || Compat.hudHidden(mc)) return;
+        if (SHOWN.isEmpty() || (!onMenu && Compat.hudHidden(mc))) return;
         Object win = Reflect.call(mc, "getWindow");
         double w = Reflect.num(Reflect.call(win, "getGuiScaledWidth"), 0), h = Reflect.num(Reflect.call(win, "getGuiScaledHeight"), 0);
         if (w <= 0 || h <= 0) return;

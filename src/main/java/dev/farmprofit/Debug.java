@@ -18,7 +18,7 @@ import java.util.regex.Pattern;
 public final class Debug {
     private static final Path LOG = Config.DIR.resolve("unrecognised-messages.txt");
     private static final Pattern INTERESTING = Pattern.compile(
-            "(?i)drop!|catch!|slayer|shard|trophy|offer accepted|pest|tree gift|contest|pristine|reward|secrets|kuudra|burrow|visitor|treasure|lockpick|2x powder|pickaxe ability|is now available");
+            "(?i)drop!|catch!|slayer|shard|trophy|offer accepted|pest|tree gift|contest|pristine|reward|secrets|kuudra|burrow|visitor|treasure|lockpick|2x powder|pickaxe ability|is now available|approaching|stashed|commission|goblin|inquisitor|reboot|closing");
     /** How often each kind of message has been recognised. */
     public static final Map<String, Integer> SEEN = new LinkedHashMap<>();
     private static final Set<String> logged = new HashSet<>();
@@ -62,6 +62,25 @@ public final class Debug {
                 "Hypixel shows '+12 Farming (123/456)' above your hotbar when you gain skill XP. The skill XP/h line reads it."));
         c.add(new Check(reading, "Pickaxe ability messages", ability ? Boolean.TRUE : null, ability ? "seen" : "none seen yet (use your pickaxe ability)",
                 "Hypixel's 'You used your ... Pickaxe Ability!' and '... is now available!' messages. The ready alert reads them."));
+
+        String[] alertKinds = {"worm spawn", "rare sea creature", "drop alert", "stash", "pest spawn", "visitor arrived", "commission done",
+                "goblin spawn", "inquisitor", "cold alert", "server restart", "slayer boss spawn", "event alert"};
+        List<String> seenAlerts = new ArrayList<>();
+        for (String k : alertKinds) if (SEEN.containsKey(k)) seenAlerts.add(k);
+        c.add(new Check(reading, "Alert messages", seenAlerts.isEmpty() ? null : Boolean.TRUE,
+                seenAlerts.isEmpty() ? "none seen yet (they show up when the events happen)" : "seen: " + String.join(", ", seenAlerts),
+                "Scatha / worm spawns, rare sea creatures, pet drops, stash, pests, commissions, goblins, cold and server restarts are read from Hypixel's messages and sidebar."));
+
+        boolean chest = SEEN.containsKey("reward chest");
+        c.add(new Check(reading, "Dungeon / Kuudra chests", chest ? Boolean.TRUE : null,
+                chest ? "counted " + SEEN.get("reward chest") + " time" + (SEEN.get("reward chest") == 1 ? "" : "s") : "none opened yet (open a reward chest after a run)",
+                "The contents and the price are read from the chest window when you click 'Open Reward Chest' and added to the Dungeons / Kuudra profit. If an opened chest is never counted, Hypixel changed that window."));
+
+        int places = CrystalMap.placeCount();
+        c.add(new Check(reading, "Crystal Hollows map", CrystalMap.drawn ? Boolean.TRUE : null,
+                CrystalMap.drawn ? (places > 0 ? Health.count(places, "places") + " found in this lobby" : "drawn, no places found yet")
+                        : (Config.get().crystalMap ? "shows when you are in the Crystal Hollows" : "off in the settings"),
+                "The minimap learns places from the sidebar's place name when you walk into one, the speech of the NPC that lives there and party coordinates."));
 
         String hooks = "Hooks into the game";
         c.add(new Check(hooks, "Particle hook", Lockpick.hooked ? Boolean.TRUE : null, Lockpick.hooked ? "sees particles" : "no particles seen yet",

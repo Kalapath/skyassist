@@ -98,7 +98,7 @@ public final class DianaBurrows {
         }
     }
 
-    private static String arrow(Minecraft mc, double x, double z) {
+    static String arrow(Minecraft mc, double x, double z) {
         double target = Math.toDegrees(Math.atan2(-(x - mc.player.getX()), z - mc.player.getZ()));
         double rel = ((target - mc.player.getYRot()) % 360 + 540) % 360 - 180;
         return ARROWS[(((int) Math.round(rel / 45.0)) % 8 + 8) % 8];

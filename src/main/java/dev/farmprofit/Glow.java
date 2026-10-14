@@ -11,7 +11,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Glowing outlines (visible through walls) for things worth seeing: pests, starred dungeon mobs, keys, bats,
- * Zealots / Special Zealots, Ghosts, commission mobs, your slayer boss, rare sea creatures, Minos Inquisitors.
+ * Zealots / Special Zealots, Ghosts, commission mobs, Scatha and worms, your slayer boss, rare sea creatures, Minos Inquisitors.
  * The glow itself is switched on by two small hooks (GlowMixin / GlowColorMixin).
  */
 public final class Glow {
@@ -114,6 +114,7 @@ public final class Glow {
             else if (c.glowZealots && tag.contains("Zealot")) color = 0xAA00AA;
             else if (mining && c.glowGhosts && tag.contains("Ghost")) color = 0xFFFFFF;
             else if (mining && c.glowCommission && COMMISSION.stream().anyMatch(tag::contains)) color = 0xFFFF55;
+            else if (mining && c.glowScatha && (tag.contains("Scatha") || tag.contains("Worm"))) color = tag.contains("Scatha") ? 0xFF5555 : 0xFFAA00;
             else if (c.glowInquisitor && tag.contains("Minos Inquisitor")) color = 0xFFAA00;
             else if (c.glowSeaCreatures && SEA.stream().anyMatch(tag::contains)) color = 0x55FFFF;
             if (color == null) continue;
@@ -136,6 +137,7 @@ public final class Glow {
                 bossTag = s;
                 bossSeen = System.currentTimeMillis();
                 Safe.run("Slayer boss timer", SlayerTimes::onBossSeen);
+                Safe.run("Slayer spawn alert", EventAlerts::onSlayerBoss);
             }
             else if (s.matches("^\\d{1,2}:\\d{2}$")) bossTimer = s;
         }

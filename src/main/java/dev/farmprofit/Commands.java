@@ -60,6 +60,8 @@ public final class Commands {
         add("HUD", "Timers panel", "Dark Auction, Mining event, Cult, festivals, Jacob, and bosses (Broodmother, Endstone Protector, Dragon...): each on/off in Settings → Timers.");
         add("HUD", "/profit secrets", "Dungeon secret finder on or off.");
         add("HUD", "Crystal Hollows treasure chests", "Automatic: box + countdown on uncovered chests, chests/min, Double Powder, loot (Mining settings).");
+        add("HUD", "Crystal Hollows minimap", "Automatic in the Crystal Hollows: a small map with you, the places you've found and your treasure chests. Move it like any panel; size and options in Settings → Mining → Crystal Hollows map.");
+        add("HUD", "Alerts", "Scatha, rare drops, pests, stash, server restart and more: big text + ding. Every switch is in Settings → Alerts (with a Test alert button).");
 
         add("Bazaar", "/flips", "Flip finder, plan, your orders and flip profit (menu).");
         add("Bazaar", "/flips chat", "Best flips in chat (click one to open it in the Bazaar).");
@@ -91,7 +93,7 @@ public final class Commands {
         add("Tools", "/shards set <shard> <level> <have>", "Fix a shard by hand, e.g. /shards set Grove 3 5 (level 3, already have 5).");
         add("Tools", "/itemsearch", "Everything in your Ender Chest and backpacks, searchable, with where it is (menu).");
         add("Tools", "/waypoints", "Waypoints from party chat and Crystal Hollows places; share or remove them (menu).");
-        add("Tools", "Macro keys", "Six keys that run commands: set keys in Controls → SkyAssist, commands in Settings → Extras.");
+        add("Tools", "Macro keys", "Six keys that run commands: set keys in Controls → SkyAssist, commands in Settings → Chat & controls.");
         add("Tools", "/hotm", "Best Heart of the Mountain trees: powder grinding, gemstones, mithril, glacite, starting out.");
         add("Tools", "/hotf", "Best Heart of the Forest trees: Fig (Forest Whispers), Helix (Desert Whispers), basics.");
         add("Tools", "/greenhouse", "Pick a mutation: what to unlock first, and a planting layout in the world (menu).");

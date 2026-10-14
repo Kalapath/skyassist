@@ -227,6 +227,7 @@ public final class FarmProfitClient implements ClientModInitializer {
                             }
                             graphics.text(mc.font, (box.hidden() ? "§8" : "") + l.text(), tx, ly, 0xFFFFFFFF, cfg.hudShadow);
                         }
+                        if (box.id().equals("crystalmap")) CrystalMap.draw(graphics, mc, x, y + lh, box.hidden());   // under the title line
                         if (box.id().equals("greenhouse")) {
                             Greenhouse.Grid g = Greenhouse.grid();
                             if (g != null) {

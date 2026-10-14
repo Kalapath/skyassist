@@ -12,11 +12,16 @@ Every session resets after 15 minutes of no activity and is saved to a history l
 | Foraging | chop logs on Galatea / The Park, get Tree Gifts |
 | Fishing | cast or reel a fishing rod, kill sea creatures |
 | Combat | hit mobs anywhere else, start a slayer quest, kill a slayer boss |
+| Dungeons | being inside a dungeon run (the whole time counts as run time), hitting mobs, opening reward chests |
+| Kuudra | being in Kuudra's Hollow, hitting mobs, opening its chests |
+| Diana | digging burrows, killing mythological mobs |
 
 ## What's counted as profit
 - Items going into your inventory or sacks (anything stackable that has a Bazaar / lowest-BIN price)
 - Rare drops (RARE DROP!, PET DROP!, GOOD/GREAT/OUTSTANDING CATCH! ...) that weren't already counted as items
 - Attribute shards (they go to the Hunting Box)
+- Dungeon and Kuudra reward chests: what the chest window shows (essence, books, gear, shards, pets) counts when you open it, and its price (coins, keys) is subtracted
+- Flips (Bazaar and Auction House): sale minus what you paid, after the Bazaar tax / auction claim tax and the estimated auction listing fee
 - Minus slayer quest costs, if you set `slayerQuestCost` in the config
 
 ## Commands
@@ -51,6 +56,86 @@ Open chat (**T**). While chat is open:
 Detected automatically from your purse on the sidebar when a quest starts (handles Aatrox discounts etc.).
 If you'd rather use a fixed number, set `slayerQuestCost` in the config (anything above 0 overrides auto-detection).
 
+## New in 8.14.1 — profit fixes
+Several profit numbers were wrong. Every profit panel was checked against what the game really does; this is what turned up.
+
+| Panel | What was wrong | Now |
+|---|---|---|
+| Dungeons / Kuudra | Reward chests were mostly missed. Only stackable items arriving in the inventory counted, so essence, enchanted books, armour, weapons, shards and pets never did; Kuudra's Free / Paid Chest windows were not recognised; the price was only charged when a stackable item happened to arrive | The chest window is read once it has loaded (title, contents, the price on Open Reward Chest). When you open it (coins leave your purse, a key is used up, or something arrives) the contents are added to the run's profit and the price is subtracted, once. Books are priced by enchantment, pets by type and rarity. A Kismet Feather used for a reroll counts as used up by the run |
+| Kuudra | A key had no price | A key costs what it takes to make: its coins plus the materials plus 2 Corrupted Nether Stars, at today's prices. Settings → Combat → Kuudra key cost sets your own number |
+| Dungeons / Kuudra | Profit per hour only counted the seconds you hit something | The whole time inside the dungeon / Kuudra's Hollow counts |
+| Flips (Bazaar) | "Order Flipped! 5x Coal for 13.0 coins of total expected profit" - the 13.0 is the profit but was read as a price | The sell offer's price is worked out from the profit, your buy price and the Bazaar tax, and checked against the market |
+| Flips (Bazaar) | Selling more items than you had bought counted all the revenue against part of the cost | Only the part you bought counts as a flip; the chat line says so |
+| Flips (Auction House) | The fee for listing the item was ignored | Estimated and subtracted: BIN 1% under 10M, 2% up to 100M, 2.5% above; normal auctions 5%. The small duration fee is not included. Settings → Market → Count AH listing fee |
+| Pet drops | PET DROP! pets had no price or the wrong rarity | The rarity is read from the colour of the name in the message, so a Legendary Golden Dragon is priced as one |
+| Diana | A pause of 30 s between burrows stopped the clock | Gaps of up to 90 s count |
+
+The chest windows, the "Open Reward Chest" price text and the pet BIN keys follow what other SkyBlock mods read, but could only be
+checked here against made-up windows, not on Hypixel. The Status page (`/skyassist status`) has a new "Dungeon / Kuudra chests"
+line: it turns green after the first chest was counted (and stays grey if none was; Copy report includes it when you ask for help).
+Still not included: the Kuudra pet's extra Crimson Essence, the auction duration fee, and listings that expire
+unsold (their fee is lost).
+
+## New in 8.14.0 — alerts, a tidier settings menu and a Crystal Hollows minimap
+**Display only, as always.** An alert shows big text, rings and sometimes adds a line to chat. Nothing in this version clicks,
+walks, aims or buys for you (a button or key does something only when *you* press it).
+
+### Alerts for the usual things
+Big text in the middle of the screen plus a ding, read from Hypixel's own chat lines, name tags and sidebar. Every alert has its
+own switch **in its activity's tab** and all of them are also collected in **Settings → Alerts** (with a **Test alert** button that
+shows the real thing over the menu, so you can judge size and sound). The alert style (on/off, ding) is in General → Alerts.
+
+| Alert | What sets it off | Where |
+|---|---|---|
+| Scatha / worm | Hypixel's "You hear the sound of something approaching…"; then the name tag decides: **SCATHA!** (with direction, distance and a chat line), *Worm*, or "Worm or Scatha!" if no tag shows up. *Scatha only* ignores plain worms | Mining → Alerts |
+| Rare sea creature | the spawn message of the legendary / mythic ones: Carrot King, Water Hydra, Yeti, Reindrake, Phantom Fisher, Grim Reaper, Great White Shark, Abyssal Miner, Thunder, Lord Jawbus, Plhlegblast, Alligator, Titanoboa, Ragnarok, Fiery Scuttler, Wiki Tiki, Blue Ringed Octopus, The Loch Emperor, Nessie, Puddle Jumper, Frog Prince, Silkbreeze, Giant Isopod | Fishing → Alerts |
+| Pet / rare drop | PET DROP!, INSANE, CRAZY RARE, VERY RARE and RARE drops. *Alert for* picks the lowest one: pets only, very rare and up (default), all rare drops | General → Alerts |
+| Stash | "You have N items / materials stashed away!" (at most once a minute) | General → Alerts |
+| Server restart | the "Server closing" countdown in the sidebar: when it first shows, at one minute, and for the last 15 seconds | General → Alerts |
+| Pests | one pest appeared, several spawned, or pests spawned while you were away, with the plot | Farming → Alerts |
+| Visitor | a visitor "has arrived on your Garden!", with their name (off by default) | Farming → Alerts |
+| Commission done | a "Commission Complete! Visit …" message, naming who to visit | Mining → Alerts |
+| Golden / Diamond goblin | "A Golden Goblin has spawned!" | Mining → Alerts |
+| Cold | the Cold on the sidebar (Glacite Tunnels, Mineshafts) reaches *Cold alert at* (default 70; you freeze at 100) | Mining → Alerts |
+| Your slayer boss | its name tag shows up after a quiet spell | Combat → Slayer |
+| Minos Inquisitor | when you dig one up | Combat → Diana |
+| Dark Auction / Cult of the Fallen Star | *Minutes before* it starts (default 1), and again when it opens (off by default; follows the Timers panel switches) | Timers → Event alerts |
+| Order filled, auction sold / outbid | like before; the big alert for a filled order is a new switch | Market → Alerts |
+
+Already there and now listed in the same place: Jacob's contest, Mineshaft found, pickaxe ability ready, fishing bite,
+price alerts, hot flips and inventory full. The rare sea creature alert and the older "sea creature" tag alert are one alert now
+(no double ding). There is also a new outline for Scatha and worms: Mining → Glow → *Glow: Scatha & worms*.
+
+### Tidier settings
+- **14 tabs** in a sensible order: General, HUD, **Alerts**, Farming, Mining, Foraging, Fishing, Combat, Dungeons,
+  **Market** (was Bazaar), Items, Timers, **Chat & controls** (was Chat & sounds, now with the macro keys), Advanced. The Extras
+  tab is gone: swimming pose and slow swing are in General → Performance & look, rainbow enchants in Items → Enchants.
+- Inside a tab, settings sit in headed sections (*Farming HUD*, *Pests*, *Alerts*, *Values*…), main switch first.
+- **Sub-options are indented** under the switch they belong to, and turn **grey** while that switch is off (you can still change
+  them, they just have no effect until the switch is on).
+- The search box finds a setting by its name, its description or its tab; `/flips settings` and the *Best settings* button open Market.
+
+### Crystal Hollows minimap
+A small top-down map on the HUD while you are in the Crystal Hollows (north is up). **Settings → Mining → Crystal Hollows map**
+(on by default; it needs *HUD → Show HUD*; drag it with `/profit gui` like any panel, the editor shows a preview anywhere).
+- The whole 621 × 621 cave with its four quarters (**J**ungle, **M**ithril Deposits, **G**oblin Holdout, **P**recursor Remnants)
+  around the **Crystal Nucleus**, a white **arrow** for you that turns the way you face, and the quarter you are in on the title line.
+- Down in the **Magma Fields** (Y 64 and below) the map is tinted orange.
+- **Places** are different in every lobby, so the map learns them from what the game tells you: the place name on the sidebar when
+  you walk in (Jungle Temple, Goblin Queen's Den, Mines of Divan, Lost Precursor City, Khazad-dûm, Fairy Grotto, Dragon's Lair),
+  the speech of the NPC who lives there (Kalhuiki Door Guardian, King Yolkar, Golden Dragon, Professor Robot), and coordinates
+  your party shares (*x: … y: … z: … | Jungle Temple*). A list under the map gives the direction and distance to each one.
+  Forgotten when you change lobby or leave the Hollows for a couple of minutes.
+- Your **treasure chests** (green → yellow → red as they run out of time) and party waypoints are dots too.
+- Settings: *Map size* (60–240 px), *Map opacity*, *Show found places*, *Place list under the map*, *Show treasure chests*.
+- It never reveals anything the game doesn't show you: no unseen mobs, no hidden structures. Places appear after you have been in
+  them, not before.
+
+### Not verified in game
+The message and sidebar formats are the ones other SkyBlock mods read (taken from their source), I couldn't test them on Hypixel.
+If an alert or a place doesn't react, *Status → Features* shows whether the message was ever seen, and
+`config/skyassist/unrecognised-messages.txt` collects lines that looked relevant.
+
 ## New in 8.13.0 — ideas from other SkyBlock mods
 I compared SkyAssist with what players like in SkyHanni, Skyblocker, Odin, Firmament, NoFrills and similar mods, and added the
 gaps that fit this mod's rule: **display only, nothing plays for you.** Every new option is in the settings, under its activity.
@@ -58,9 +143,9 @@ gaps that fit this mod's rule: **display only, nothing plays for you.** Every ne
   (`above` works too; add `sell` to watch what you'd get selling instead of what you'd pay buying). You get a ding, big text
   in the middle of the screen and a chat line with an *Open in Bazaar* button (you place the order yourself). `/alerts` lists
   them with the current price, `/alert remove <number>` and `/alert clear` tidy up. While an alert is waiting, prices refresh
-  as often as *Order check every (s)*. Settings → Bazaar → Price alerts.
+  as often as *Order check every (s)*. Settings → Market → Alerts.
 - **Pickaxe ability** (Mining): Hypixel says when you use it and when it's ready again; the cooldown shows on the Mining HUD
-  and a ready alert rings. It never uses the ability for you. Settings → Mining → Pickaxe ability.
+  and a ready alert rings. It never uses the ability for you. Settings → Mining (HUD line and Alerts).
 - **Skill XP/h** (HUD): the XP numbers Hypixel shows above your hotbar become *Farming XP: 1.2M/h · next level in 12m 30s*.
   Settings → HUD → Main HUD → Show skill XP/h.
 - **Slayer boss kill time** (Combat): timed from when your boss appears to the kill; chat shows it with your best and average,
@@ -117,7 +202,7 @@ A full pass over the whole mod, aimed at "it should never crash, and when someth
 - New **Movers** tab: biggest 24 h / 7 d price moves, so there's always something to see even when no signal passes the backtest.
 
 ## New in 8.11.0
-- **★ Best settings** (every /flips tab, Settings → Bazaar, or `/flips tune`): tries ~500 combinations of min item price,
+- **★ Best settings** (every /flips tab, Settings → Market, or `/flips tune`): tries ~500 combinations of min item price,
   min margin, min volume and number of orders on today's Bazaar prices with your budget, and keeps the one with the most
   profit per bit of work. Work per order goes up when an item is fought over (lots of orders → you get outbid and relist),
   fills slowly, or means moving thousands of items. Score = profit/h ÷ work^0.7, so a few big calm flips beat many small busy
@@ -132,7 +217,7 @@ A full pass over the whole mod, aimed at "it should never crash, and when someth
 - Read from chat (auction started, sold, collected, bid placed, outbid, claimed, BIN purchase) and from **/ah → Manage
   Auctions / Your Bids** (open them once to pick up auctions made before updating; the menus always win).
 - AH buys (BIN or won bids) count as flip buys, so selling them later (AH or Bazaar) shows the profit in the flip log and
-  "Flip profit today". Settings → Bazaar → Your orders: Show auctions on HUD, how many to list.
+  "Flip profit today". Settings → Market → Your orders: Show auctions on HUD, how many to list.
 
 ## New in 8.9.0
 - **Craft flips only show what you can craft.** Each recipe's requirement (collection tier, slayer level, HotM tier or
@@ -141,12 +226,12 @@ A full pass over the whole mod, aimed at "it should never crash, and when someth
   level-up messages in chat (saved in `config/skyassist/unlocks.json`).
 - Locked recipes are hidden (both Craft → Bazaar and Craft → AH). Recipes whose requirement SkyAssist hasn't seen yet are
   shown with a note, or hidden too with *Hide when level unknown*. Toggle with "Only what I can craft" on the craft tabs or
-  in Settings → Bazaar → Craft flips. The footer shows how many levels are known and how many recipes were hidden.
+  in Settings → Market → Craft flips. The footer shows how many levels are known and how many recipes were hidden.
 
 ## New in 8.8.0
 - **Safe flips only** now works for normal Bazaar flips too (one switch for every flip tab, also on the Best flips tab and
   `/flips set safe on`). It hides flips with a ⚠ warning, under 3% margin, or a buy/sell gap over 25%; the footer says how many it hid.
-- **Tidier settings**: 14 tabs instead of 16 (Kuudra and Diana moved into Combat, macro keys into Extras), every tab split into
+- **Tidier settings**: 14 tabs instead of 16 (Kuudra and Diana moved into Combat, macro keys into Extras, which became *Chat & controls* in 8.14.0), every tab split into
   headed sections, main on/off switches first, and URLs / counting rules / extra areas moved to a new **Advanced** tab.
 - Flip filters are one box each now: type coins (`50k`) or a % of your budget (`0.1%`) into *Min item price*, *Min profit per
   flip* and *Craft flips: min profit*. Your old settings are carried over. In the flips menu the buttons cycle through presets.
@@ -174,7 +259,7 @@ A full pass over the whole mod, aimed at "it should never crash, and when someth
 - **Events**: the same around past Spooky Festivals, Seasons of Jerry and New Years.
 - **Trends**: prices unusually low / high vs. the last 7 days (z-score), with 24 h and 7 d change.
 - **Backtest**: each signal is checked against every past case (leave-one-out); only signals that were right often enough
-  are shown, with their hit rate (e.g. 4/5). Thresholds in Settings → Bazaar.
+  are shown, with their hit rate (e.g. 4/5). Thresholds in Settings → Market → Market signals.
 - Data is cached for a day in `config/skyassist/market`; the first load takes a minute or two in the background.
 
 ## New in 8.6
@@ -219,7 +304,7 @@ A full pass over the whole mod, aimed at "it should never crash, and when someth
   Flaming Flay... no longer start a fishing session).
 - **Only what the activity gave counts**: items count for a profit HUD if they're that activity's own items or arrived
   within a few seconds of your last action (break, catch, hit...). Trades, other people's drops etc. don't count.
-  Settings → General: on/off and the window.
+  Settings → Advanced → What counts as profit: on/off and the window.
 - **Fishing extras** (like SkyHanni): bobber timer, your living sea creatures (count + oldest), a ding at your cap,
   and a rare sea creature alert with [Share with party].
 - **Visitor shopping list**: opening a Garden visitor lists what they want; [Bazaar] opens the item and copies the
@@ -286,7 +371,7 @@ A full pass over the whole mod, aimed at "it should never crash, and when someth
 2. **Shaders**: with an Iris shader pack on, highlights switch to particle boxes automatically (Highlight style setting).
 3. **Clash-free start**: with SkyHanni / Skyblocker installed, SkyAssist's HUD starts on the right under the scoreboard.
 4. **What do you play?** in the setup screen (`/profit setup`): one click switches an activity's HUD + helpers.
-5. **Macro keys**: 6 keys that run commands (Controls → SkyAssist; commands in Settings → Extras).
+5. **Macro keys**: 6 keys that run commands (Controls → SkyAssist; commands in Settings → Chat & controls).
 6. **Inquisitor sharing**: [Share with party] (or auto-share) when you dig one up; party coordinates from anyone
    (SkyAssist, SkyHanni or typed) become a light beam + HUD arrow. `/waypoints` to share / remove.
 7. **Mineshaft alert**: ding + big HUD line + [Share with party] when you find a Glacite Mineshaft.
@@ -294,7 +379,7 @@ A full pass over the whole mod, aimed at "it should never crash, and when someth
 9. **Boss health**: your slayer boss's health and timer on the Combat HUD.
 10. **Jacob's contest standing**: collected amount and medal bracket on the Farming HUD during a contest.
 11. **Storage overview**: `/itemsearch` lists everything in your Ender Chest pages and backpacks with where it is.
-12. **Extras** tab: disable swimming pose, slow swing (with swing length), rainbow maxed enchants.
+12. **Extras** tab: disable swimming pose, slow swing (with swing length), rainbow maxed enchants (the tab was split up in 8.14.0).
 
 ## New in 7.0
 - **Glowing outlines** (through walls), each with its own switch: starred dungeon mobs (gold), Wither / Blood key,
@@ -303,7 +388,7 @@ A full pass over the whole mod, aimed at "it should never crash, and when someth
 - **Diana burrow finder**: burrows marked from their particles (green start / red mob / gold treasure) with a HUD list,
   and the Ancestral Spade's particle trail turned into a cyan direction beam.
 - **Fishing bite alert**: ding + "REEL IN!" when !!! appears over your bobber.
-- **Chat & sounds** settings tab: hide sack messages, ability cooldown, "blocks in the way", Garden visitor chatter,
+- **Chat & sounds** settings tab (now *Chat & controls*): hide sack messages, ability cooldown, "blocks in the way", Garden visitor chatter,
   Watchdog announcements, anything containing your own words; mute explosions or any server sound by name
   ("Show sound names" helps you find them).
 - **Labels on items**: pet level, minion tier, enchanted book level.
@@ -498,7 +583,7 @@ Each one can be turned off in Settings → Dungeons. Still not included: Boulder
 - `/profit report` copies a diagnostics report to paste to Claude; `/profit note <text>` adds a note to the current session
   (shown in history and the CSV).
 - **Profiles**: `/profit profile save <name>`, `load <name>`, `list`, `export` (copies a code), `import <code>`.
-- **New-build check**: tells you when your GitHub repo has a newer successful build (Settings → General → GitHub repo).
+- **New-build check**: tells you when your GitHub repo has a newer successful build (Settings → Advanced → Data sources → GitHub repo).
 
 ## New in 3.1
 - Combat sessions only start after real fighting: 5 mob hits within 30 s (players, NPCs and armor stands never count),
@@ -538,7 +623,7 @@ Hypixel and no longer depends on the tab list's Area line. Without it, the tab l
 ## Settings menu
 Press **O** (rebind it in Options → Controls → Key Binds → "SkyAssist"), or use `/profit settings`,
 to open a menu with **every** setting, grouped into tabs:
-General, HUD, Farming, Mining, Foraging, Fishing, Combat (incl. Kuudra and Diana), Dungeons, Bazaar, Items, Chat & sounds, Timers, Extras (incl. macro keys) and Advanced (data URLs, counting rules, extra areas/blocks). Each tab is split into headed sections.
+General, HUD, **Alerts** (every alert in one place, with a Test alert button), Farming, Mining (incl. the Crystal Hollows map), Foraging, Fishing, Combat (incl. Kuudra and Diana), Dungeons, Market (flipping, orders and /market), Items, Timers, Chat & controls (chat filter, sounds, macro keys) and Advanced (data URLs, counting rules, extra areas/blocks). Each tab is split into headed sections; a sub-option is indented under its switch and greyed while that switch is off.
 Each activity tab also has a switch to hide that activity's HUD (tracking keeps running).
 Hover a setting for an explanation. On/off settings are buttons, choices cycle when clicked, numbers accept
 `10m` / `500k`, lists are comma separated and item/block maps use `name=ID, name2=ID2`.

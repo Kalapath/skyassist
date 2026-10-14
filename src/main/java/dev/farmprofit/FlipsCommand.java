@@ -45,7 +45,7 @@ final class FlipsCommand {
                 .then(ClientCommands.literal("untune").executes(ctx -> {
                     Tracker.say(FlipTuner.undo() ? "§6[Flips] §7Settings restored." : "§6[Flips] §7Nothing to undo.");
                     return 1; }))
-                .then(ClientCommands.literal("settings").executes(ctx -> { settings(); SettingsScreen.requestOpen("Bazaar"); return 1; }))
+                .then(ClientCommands.literal("settings").executes(ctx -> { settings(); SettingsScreen.requestOpen("Market"); return 1; }))
                 .then(ClientCommands.literal("set")
                         .then(ClientCommands.argument("setting", StringArgumentType.word())
                                 .then(ClientCommands.argument("value", StringArgumentType.word()).executes(ctx -> {
